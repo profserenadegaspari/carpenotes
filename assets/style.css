@@ -568,3 +568,23 @@ span.pick{cursor:default}
 .vt-riep{font-size:.9rem;background:var(--brand-soft);border-radius:10px;padding:8px 12px;margin:0 0 12px}
 .vt-tutta{margin-top:16px;border-top:2px dashed var(--line);padding-top:12px}
 .vt-tutta textarea{width:100%}
+
+/* Medaglie delle sfide (1, 3, 5, 10 sfide consegnate) */
+.med-track{position:relative;padding-top:4px}
+.med-track .line{position:absolute;left:12.5%;right:12.5%;top:58px;height:8px;border-radius:9px;background:var(--surface-2)}
+.med-track .line i{display:block;height:100%;border-radius:9px;background:var(--brand)}
+.meds{position:relative;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center}
+.med{text-align:center;min-width:0}
+.med svg{display:block;width:96px;height:115px;margin:0 auto 6px}
+.med .n{font-weight:800;line-height:1.2}.med .d{font-size:.8rem;color:var(--muted);line-height:1.3;margin-top:2px}
+.med text{font-family:var(--display);font-weight:800}
+.med.on svg{filter:drop-shadow(0 3px 0 var(--shadow-c))}
+.med.on .na1{fill:#5a3cf0}.med.on .na2{fill:#ff5a93}.med.on text{fill:#1b1740}
+.med .m3{fill:none;stroke-width:2.5}
+.med.m-bronzo .m1{fill:#b8692d}.med.m-bronzo .m2{fill:#e7a76b}.med.m-bronzo .m3{stroke:#f6d2ad}
+.med.m-argento .m1{fill:#8d93a8}.med.m-argento .m2{fill:#d8dbe6}.med.m-argento .m3{stroke:#f3f4f8}
+.med.m-oro .m1{fill:#c99400}.med.m-oro .m2{fill:#ffd23f}.med.m-oro .m3{stroke:#fff0b0}
+.med.m-lilla .m1{fill:#5a3cf0}.med.m-lilla .m2{fill:#b7a7ff}.med.m-lilla .m3{stroke:#e6e1ff}
+.med.off .na1,.med.off .na2{fill:var(--line)}.med.off .m1{fill:var(--edge)}.med.off .m2{fill:var(--surface-2)}.med.off .m3{stroke:var(--surface);stroke-dasharray:4 4}.med.off text{fill:var(--edge)}
+.trags .med svg{width:70px;height:84px}
+@media(max-width:600px){.meds{grid-template-columns:repeat(2,1fr);row-gap:20px}.med-track .line{display:none}}

@@ -1,4 +1,4 @@
-/* Carpe Notes — Sfide: esercizi aperti senza soluzione automatica, corretti dalla docente.
+/* Carpe Notes — Sfide: esercizi aperti senza soluzione automatica. La docente legge le consegne e manda la correzione per email.
    Le sfide stanno nell'elenco "sfide" dei contenuti: {id, titolo, livello, ambito, sblocco: [id degli argomenti da superare], intro, prove}.
    Tipi di prova:
      analisi  {titolo, consegna, frase, parole?, etichette?, punti, guida}   divide la frase in sintagmi (parole:true = già divisa parola per parola) e scrive la funzione di ognuno
@@ -8,12 +8,12 @@
      scrivi   {titolo, consegna, vincoli[], minParole, punti, guida}       testo libero con vincoli da rispettare
      versione {titolo, consegna, categorie, frasi: [{la ('[parola|cat]'), aiuto (completo|indizi|lessico|libera), aiuto_testo?, domanda?: [q, [giusta, …]], lex?, modello, punti?}], punti, guida}
               versione a tappe: per ogni frase colora, rispondi, traduci (sfida con versione:true: sezione «Versioni»)
-   Il percorso: bozza (salvata da sola) → inviata (va nel file dei risultati) → corretta (torna con il file delle correzioni). */
+   Il percorso: bozza (salvata da sola) → inviata (va nel file dei risultati). Niente punti né stelle: si contano le sfide consegnate
+   (medaglie a 1, 3, 5 e 10). Dalla parte della docente una consegna può essere segnata come «corretta» (c.letta). */
 (function(){
   const {esc} = CN;
   CN.K.sfide = 'cn_sfide';          // consegne fatte su questo dispositivo (studente)
   CN.K.sfideDoc = 'cn_sfide_doc';   // consegne ricevute e corrette (docente)
-  const XP_STELLA = 50;
   const ETICHETTE = ['soggetto','predicato verbale','predicato nominale','attributo','apposizione','complemento oggetto',
     'complemento predicativo del soggetto',"complemento predicativo dell'oggetto",'complemento di specificazione','complemento di termine',
     "complemento d'agente",'complemento di causa efficiente','complemento di stato in luogo','complemento di moto a luogo','complemento di moto da luogo',
@@ -56,18 +56,6 @@
       tentativo: st.length + 1, risposte: da ? CN.clone(da.risposte) : {}, nota: '', stato: 'bozza', creata: new Date().toISOString()};
   }
   const inviate = s => diStudente(s).filter(c => c.stato !== 'bozza');
-  // Le correzioni arrivano dalla docente con un file: si abbinano per id (o per studente, se la consegna era su un altro dispositivo)
-  function importaCorrezioni(d, s){
-    const arr = (d && (d.consegne || d.sfide)) || [];
-    const a = tutte(); let n = 0;
-    arr.forEach(c => {
-      if(!c || !c.id || !c.correzione) return;
-      const i = a.findIndex(x => x.id === c.id);
-      if(i >= 0){ if(JSON.stringify(a[i].correzione) !== JSON.stringify(c.correzione)){ a[i].correzione = c.correzione; a[i].stato = 'corretta'; n++; } }
-      else if(s && CN.studKey(c) === CN.studKey(s)){ a.push(Object.assign({}, c, {stato: 'corretta'})); n++; }
-    });
-    salvaTutte(a); return n;
-  }
 
   /* ---------- Archivio della docente ---------- */
   const doc = () => CN.load(CN.K.sfideDoc, []);
@@ -81,15 +69,15 @@
     });
     salvaDoc(a); return n;
   }
-  function salvaCorrezione(id, corr){ const a = doc(); const c = a.find(x => x.id === id); if(!c) return; c.correzione = corr; c.stato = 'corretta'; salvaDoc(a); }
-  const docDi = k => doc().filter(c => CN.studKey(c) === k && c.correzione);
+  // La docente segna una consegna come corretta (la correzione la manda per email)
+  const letta = c => !!(c.letta || c.correzione);
+  function segnaLetta(id, v){ const a = doc(); const c = a.find(x => x.id === id); if(!c) return; c.letta = v ? new Date().toISOString() : null; if(!v) delete c.correzione; salvaDoc(a); }
+  const docDi = k => doc().filter(c => CN.studKey(c) === k);
 
-  /* ---------- Punti e traguardi: per ogni sfida conta il tentativo migliore ---------- */
+  /* ---------- Medaglie: si conta quante sfide diverse sono state consegnate (almeno una volta) ---------- */
   function riepilogo(consegne){
-    const best = new Map();
-    (consegne||[]).filter(c => c.correzione).forEach(c => { const st = +c.correzione.stelle||0; if(!best.has(c.sfida) || st > best.get(c.sfida)) best.set(c.sfida, st); });
-    const v = [...best.values()];
-    return {xp: v.reduce((t, x) => t + x * XP_STELLA, 0), vinte: v.filter(x => x >= 1).length, piene: v.filter(x => x >= 3).length, corrette: best.size};
+    const fatte = new Set((consegne||[]).filter(c => c.stato && c.stato !== 'bozza').map(c => c.sfida));
+    return {consegnate: fatte.size};
   }
 
   /* ---------- Disegno delle prove ---------- */
@@ -252,7 +240,7 @@
         li.insertAdjacentHTML('beforeend', `<div class="ver-passo"><b>${passo()}.</b> ${n > 1 ? 'Ora traduci la frase.' : 'Traduci la frase.'}</div>`);
         if(ro) li.insertAdjacentHTML('beforeend', `<div class="risposta">${esc(a.tr || '') || '<span class="muted">Nessuna traduzione.</span>'}</div>`);
         else { const t = CN.h(`<textarea rows="2" placeholder="Scrivi qui la tua traduzione"></textarea>`); t.value = a.tr || ''; t.setAttribute('aria-label', 'Traduzione della frase ' + (fi + 1)); t.oninput = () => { a.tr = t.value; ch(); }; li.appendChild(t); }
-        if(mode === 'doc' && f.modello) li.insertAdjacentHTML('beforeend', `<div class="vt-mod"><b>Traduzione modello${f.punti ? ` · ${f.punti} punti` : ''}</b> ${f.modello}</div>`);
+        if(mode === 'doc' && f.modello) li.insertAdjacentHTML('beforeend', `<div class="vt-mod"><b>Traduzione modello</b> ${f.modello}</div>`);
         ol.appendChild(li);
       });
       box.appendChild(ol);
@@ -357,9 +345,8 @@
   const TIPI_PROVA = {riscrivi: 'Riscrittura', analisi: 'Analisi libera', errori: 'Caccia all\'errore', motiva: 'Chi ha ragione?', scrivi: 'Scrittura con vincoli', versione: 'Versione a tappe'};
   const statoHtml = c => !c ? '<span class="badge">da affrontare</span>'
     : c.stato === 'bozza' ? '<span class="badge warn">bozza salvata</span>'
-    : c.stato === 'inviata' ? '<span class="badge">in attesa del prof</span>'
-    : `<span class="badge ok">corretta</span>`;
+    : '<span class="badge ok">consegnata</span>';
 
-  Object.assign(CN, {sfide: {elenco, lente, sblocco, totPunti, stelleDa, tutte, diStudente, storia, salvaConsegna, nuovaBozza, inviate, importaCorrezioni,
-    doc, salvaDoc, importaConsegne, salvaCorrezione, docDi, riepilogo, renderProva, mancanti, TIPI_PROVA, statoHtml, XP_STELLA, ETICHETTE}});
+  Object.assign(CN, {sfide: {elenco, lente, sblocco, totPunti, stelleDa, tutte, diStudente, storia, salvaConsegna, nuovaBozza, inviate,
+    doc, salvaDoc, importaConsegne, letta, segnaLetta, docDi, riepilogo, renderProva, mancanti, TIPI_PROVA, statoHtml, ETICHETTE}});
 })();

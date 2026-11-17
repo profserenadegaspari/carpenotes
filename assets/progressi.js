@@ -113,8 +113,7 @@
     const perfetti = validi.filter(([, a]) => a.best >= 100).length;
     const erroriAperti = [...ultimo.entries()].filter(([id, p]) => p < .999 && idx.es.has(id)).map(([id]) => id);
 
-    const S = CN.sfide ? CN.sfide.riepilogo(sf || []) : {xp: 0, vinte: 0, piene: 0, corrette: 0};
-    xp += S.xp;
+    const S = CN.sfide ? CN.sfide.riepilogo(sf || []) : {consegnate: 0};
     const COL = ['yellow','pink','green','blue','orange']; let k = 0;
     const B = (id, nome, desc, glifo, cur, tot) => ({id, nome, desc, glifo, col: COL[k++ % COL.length], ok: cur >= tot, cur: Math.min(cur, tot), tot});
     const badge = [
@@ -130,10 +129,10 @@
       B('riscatto', 'Riscatto', 'Supera un argomento che prima non avevi superato', '↗', riscatto ? 1 : 0, 1),
       B('ripasso', 'Chi ripassa vince', 'Completa 5 sessioni di ripasso', '↻', nRip, 5),
       B('pulito', 'Conti in pari', 'Correggi tutti i tuoi errori in sospeso (almeno 5)', '✓', sbagliati.size >= 5 && !erroriAperti.length ? 1 : 0, 1),
-      B('fulmine', 'Fulmine', 'Almeno 80% in meno di 3 minuti', '⚡\uFE0E', fulmine ? 1 : 0, 1),
-      B('boss', 'Caso risolto', 'Supera una sfida del prof con almeno una stella', '⚔\uFE0E', S.vinte, 1),
-      B('boss3', 'Detective di ferro', 'Prendi 3 stelle in una sfida del prof', '3★', S.piene, 1)
+      B('fulmine', 'Fulmine', 'Almeno 80% in meno di 3 minuti', '⚡\uFE0E', fulmine ? 1 : 0, 1)
     ];
+    // Medaglie delle sfide: 1, 3, 5 e 10 sfide consegnate (niente voto nell'app: la prof corregge per email)
+    MEDAGLIE.forEach(([n, nome, met]) => badge.push({id: 'sfide' + n, nome, desc: `Completa ${n} ${n === 1 ? 'sfida' : 'sfide'}`, glifo: String(n), gruppo: 'sfide', met, ok: S.consegnate >= n, cur: Math.min(S.consegnate, n), tot: n}));
     idx.sez.filter(x => x.args.length).forEach(x => {
       const ok = x.args.filter(a => { const r = args.get(a.id); return r && r.best >= soglia; }).length;
       badge.push(B('sez-' + x.s.id, x.s.titolo, 'Supera tutti gli argomenti della sezione', '★', ok, x.args.length));
@@ -142,7 +141,23 @@
       sfide: S, precisione: nEs ? Math.round(pesata / nEs) : null, superati, perfetti, provati: validi.length, totArg: idx.arg.size, erroriAperti, tipi, badge};
   }
 
+  const MEDAGLIE = [[1, 'Primo caso', 'bronzo'], [3, 'Investigatore', 'argento'], [5, 'Detective', 'oro'], [10, 'Ispettore capo', 'lilla']];
+  function medaglia(b, anim){
+    return `<div class="med ${b.ok ? 'on' : 'off'} m-${b.met} ${anim ? 'pop' : ''}"><svg viewBox="0 0 100 120" aria-hidden="true">
+      <path class="na1" d="M30 0h16l10 40h-16z"/><path class="na2" d="M70 0H54L44 40h16z"/>
+      <circle class="m1" cx="50" cy="72" r="38"/><circle class="m2" cx="50" cy="72" r="32"/><circle class="m3" cx="50" cy="72" r="26"/>
+      <text x="50" y="84" text-anchor="middle" font-size="${b.tot < 10 ? 34 : 30}">${b.tot}</text></svg>
+      <div class="n">${esc(b.nome)}</div><div class="d">${esc(b.desc)}${b.ok ? '' : ` · ${b.cur} di ${b.tot}`}</div></div>`;
+  }
+  // Le quattro medaglie in fila, con la barra che mostra quanto manca alla prossima
+  function medaglieSfide(P){
+    const M = P.badge.filter(b => b.gruppo === 'sfide'), n = P.sfide.consegnate;
+    const tappe = M.map(b => b.tot), i = tappe.filter(t => n >= t).length;
+    const pct = i >= tappe.length ? 100 : i === 0 ? (n / tappe[0]) * 0 : ((i - 1) + (n - tappe[i-1]) / (tappe[i] - tappe[i-1])) / (tappe.length - 1) * 100;
+    return `<div class="med-track"><div class="line"><i style="width:${Math.max(0, Math.min(100, pct))}%"></i></div><div class="meds">${M.map(b => medaglia(b)).join('')}</div></div>`;
+  }
   function adesivo(b, anim){
+    if(b.gruppo === 'sfide') return medaglia(b, anim);
     return `<div class="trag ${b.ok ? 'on' : 'off'} c-${b.col} ${anim ? 'pop' : ''}"><div class="g">${esc(b.glifo)}</div><div class="n">${esc(b.nome)}</div><div class="d">${esc(b.desc)}</div>
       ${!b.ok && b.tot > 1 ? `<div class="bar" title="${b.cur} di ${b.tot}"><i style="width:${Math.round(b.cur / b.tot * 100)}%"></i></div><div class="d">${b.cur} di ${b.tot}</div>` : ''}</div>`;
   }
@@ -179,7 +194,41 @@
     return html + `</div><div class="legend"><span><i style="background:var(--surface-2)"></i>nessuno</span><span><i style="background:color-mix(in srgb,var(--brand) 22%,var(--surface))"></i>1–9 esercizi</span><span><i style="background:color-mix(in srgb,var(--brand) 55%,var(--surface))"></i>10–24</span><span><i style="background:var(--brand)"></i>25 o più</span></div>`;
   }
 
-  function renderAnalitiche(el, rs, cat, sf){
+  /* Argomenti superati alla fine di ogni settimana: lo studente contro la mediana della sua classe (solo area docente) */
+  function superatiPerSettimana(rs, soglia, settimane){
+    const ord = rs.filter(r => !r.ripasso && r.argomento).slice().sort((a,b) => (a.data||'').localeCompare(b.data||''));
+    return settimane.map(fine => { const best = {}; ord.forEach(r => { if(new Date(r.data) < fine) best[r.argomento] = Math.max(best[r.argomento]||0, r.punteggio); }); return Object.values(best).filter(b => b >= soglia).length; });
+  }
+  function graficoClasse(P, classe, nome){
+    const oggi = new Date(), w0 = lunedi(P.rs[0].data), inizi = [];
+    for(let m = new Date(w0); m <= oggi; m = piu(m, 7)) inizi.push(new Date(m));
+    const fini = inizi.map(m => piu(m, 7));
+    const valido = r => P.idx.arg.has(r.argomento);
+    const io = superatiPerSettimana(P.rs.filter(valido), P.soglia, fini);
+    const altri = classe.map(rs => superatiPerSettimana(rs.filter(valido), P.soglia, fini));
+    const med = i => { const a = altri.map(x => x[i]).sort((x,y) => x - y), k = Math.floor(a.length/2); return a.length % 2 ? a[k] : (a[k-1] + a[k]) / 2; };
+    const cl = fini.map((f, i) => med(i));
+    const top = Math.max(5, Math.ceil(Math.max(...io, ...cl) / 5) * 5);
+    const W = 640, H = 230, l = 38, r = 80, t = 14, b = 30, w = W - l - r, h = H - t - b;
+    const x = i => l + (inizi.length === 1 ? w / 2 : i * w / (inizi.length - 1)), y = v => t + (1 - v / top) * h;
+    const dataBreve = d => d.toLocaleDateString('it-IT', {day:'numeric', month:'short'});
+    const linea = (arr, st) => `<polyline points="${arr.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}" fill="none" style="${st}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const passo = Math.max(1, Math.ceil(inizi.length / 8));
+    let yIo = y(io[io.length-1]) + 4, yCl = y(cl[cl.length-1]) + 4;
+    if(Math.abs(yIo - yCl) < 15){ if(io[io.length-1] >= cl[cl.length-1]){ yIo = Math.min(yIo, yCl) - 8; yCl = yIo + 15; } else { yCl = Math.min(yIo, yCl) - 8; yIo = yCl + 15; } }
+    return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Argomenti superati settimana per settimana: ${esc(nome)} e mediana della classe">
+      ${[0, top/2, top].map(v => `<line x1="${l}" x2="${W-r}" y1="${y(v)}" y2="${y(v)}" style="stroke:var(--line)" stroke-width="1"/><text x="${l-8}" y="${y(v)+4}" text-anchor="end" font-size="12" style="fill:var(--muted)">${v}</text>`).join('')}
+      ${inizi.length > 1 ? linea(cl, 'stroke:var(--muted);stroke-dasharray:6 5;opacity:.7') + linea(io, 'stroke:var(--brand)') : ''}
+      ${cl.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="4" style="fill:var(--muted);stroke:var(--surface);opacity:.8" stroke-width="2"><title>Classe (mediana), settimana del ${dataBreve(inizi[i])}: ${v}</title></circle>`).join('')}
+      ${io.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="5" style="fill:var(--brand);stroke:var(--surface)" stroke-width="2"><title>${esc(nome)}, settimana del ${dataBreve(inizi[i])}: ${v} argomenti superati</title></circle>`).join('')}
+      <text x="${x(io.length-1)+10}" y="${yIo}" font-size="13" font-weight="800" style="fill:var(--ink)">${esc(nome)}</text>
+      <text x="${x(cl.length-1)+10}" y="${yCl}" font-size="13" font-weight="700" style="fill:var(--muted)">classe</text>
+      ${inizi.map((d, i) => i % passo === 0 || i === inizi.length - 1 ? `<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="12" style="fill:var(--muted)">${dataBreve(d)}</text>` : '').join('')}
+    </svg></div>
+    <div class="legend"><span><i style="background:var(--brand)"></i>${esc(nome)}</span><span><i style="background:var(--muted);opacity:.7"></i>classe (studente a metà classifica)</span></div>`;
+  }
+
+  function renderAnalitiche(el, rs, cat, sf, classe){
     const P = profilo(rs, cat, sf);
     if(!P.rs.length){ el.innerHTML = `<div class="panel"><h3>Ancora nessun dato</h3><p class="muted" style="margin:6px 0 0">Qui compariranno andamento, giorni di attività e punti di forza dopo il primo allenamento.</p></div>`; return P; }
     const righe = [...P.args.entries()].filter(([id]) => P.idx.arg.has(id)).map(([id, a]) => Object.assign({id, titolo: P.idx.arg.get(id).a.titolo, sez: P.idx.arg.get(id).s.titolo}, a));
@@ -196,6 +245,7 @@
       </div>
       <div class="an-grid">
         <div class="panel" style="grid-column:1/-1"><h3>Andamento</h3><div class="sub">Punteggio degli ultimi ${Math.min(20, P.rs.length)} allenamenti, dal più vecchio al più recente</div>${graficoAndamento(P.rs, P.soglia)}</div>
+        ${classe && classe.length > 1 ? `<div class="panel" style="grid-column:1/-1"><h3>Argomenti superati nel tempo</h3><div class="sub">Quanti argomenti ha superato alla fine di ogni settimana, confrontato con la mediana della classe ${esc(P.rs[0].classe||'')} (${classe.length} studenti). Una linea che sale vuol dire che sta andando avanti nel programma.</div>${graficoClasse(P, classe, CN.maiuscole(P.rs[0].nome||'').split(' ')[0])}</div>` : ''}
         <div class="panel"><h3>Giorni di attività</h3><div class="sub">Ultime cinque settimane</div>${calendario(P.giorni)}</div>
         <div class="panel"><h3>Padronanza per sezione</h3><div class="sub">Argomenti superati e da migliorare</div>
           ${P.idx.sez.filter(x => x.args.length).map(x => { const st = x.args.map(a => P.args.get(a.id)); const ok = st.filter(a => a && a.best >= P.soglia).length, inc = st.filter(a => a && a.best < P.soglia).length, tot = x.args.length;
@@ -247,5 +297,5 @@
     return { go, get cur(){ return cur; }, refresh: () => cb(cur) };
   }
 
-  Object.assign(CN, {ico, stelleHtml, giorno, piu, lunedi, indice, LIVELLI, xpDi, annotaXp, livello, stelle, profilo, adesivo, renderAnalitiche, durata, router});
+  Object.assign(CN, {ico, stelleHtml, giorno, piu, lunedi, indice, LIVELLI, xpDi, annotaXp, livello, stelle, profilo, adesivo, medaglia, medaglieSfide, renderAnalitiche, durata, router});
 })();

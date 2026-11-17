@@ -262,12 +262,11 @@
     if(lente){
       // Sotto la lente: prova aperta in fondo all'argomento, corretta dalla prof (stesso percorso delle sfide)
       const st = CN.sfide.storia(s, lente.id), last = st[st.length - 1];
-      const best = Math.max(0, ...st.filter(c => c.correzione).map(c => +c.correzione.stelle || 0));
-      const cta = !last ? 'Inizia' : last.stato === 'bozza' ? 'Continua' : last.stato === 'inviata' ? 'Rivedi' : 'Vedi la correzione';
-      const el = CN.h(`<a class="card att-card lente-card ${st.some(c => c.correzione) ? 'done' : ''}" href="#/sfida/${lente.id}">
+      const cta = !last ? 'Inizia' : last.stato === 'bozza' ? 'Continua' : 'Rivedi';
+      const el = CN.h(`<a class="card att-card lente-card ${st.some(c => c.stato !== 'bozza') ? 'done' : ''}" href="#/sfida/${lente.id}">
         <div class="att-top"><span class="att-tipo t-lente">${CN.ico.lente} Sotto la lente</span><span class="att-liv">corregge la prof</span></div>
-        <h3>${esc(lente.sf.titolo)}</h3><div class="muted small">${(lente.sf.prove||[]).length} ${(lente.sf.prove||[]).length === 1 ? 'prova aperta' : 'prove aperte'} · fino a ${3 * CN.sfide.XP_STELLA} XP · non conta per superare l'argomento</div>
-        <div class="att-foot">${st.some(c => c.correzione) ? CN.stelleHtml(best) : CN.sfide.statoHtml(last)}<span class="btn ${last ? '' : 'primary'}">${cta} →</span></div></a>`);
+        <h3>${esc(lente.sf.titolo)}</h3><div class="muted small">${(lente.sf.prove||[]).length} ${(lente.sf.prove||[]).length === 1 ? 'prova aperta' : 'prove aperte'} · conta per le medaglie delle sfide · non conta per superare l'argomento</div>
+        <div class="att-foot">${CN.sfide.statoHtml(last)}<span class="btn ${last ? '' : 'primary'}">${cta} →</span></div></a>`);
       grid.appendChild(el);
     }
   }
@@ -428,96 +427,65 @@
       el.onkeydown = e => { if(e.key === 'Enter') el.click(); };
       return el;
     }
-    const tot = SF.totPunti(x.sf), best = Math.max(0, ...st.filter(c => c.correzione).map(c => +c.correzione.stelle || 0));
-    const cta = !last ? 'Accetta la sfida' : last.stato === 'bozza' ? 'Continua la sfida' : last.stato === 'inviata' ? 'Rivedi la consegna' : 'Vedi la correzione';
+    const cta = !last ? 'Accetta la sfida' : last.stato === 'bozza' ? 'Continua la sfida' : 'Rivedi la consegna';
     const el = CN.h(`<a class="card boss-card" href="#/sfida/${x.id}">
       <div class="boss-top"><span class="stamp">${esc(x.sf.livello || 'Sfida')}</span>${SF.statoHtml(last)}</div>
       <h2>${esc(x.sf.titolo)}</h2>
       <div class="small muted">${esc(x.where)}</div>
-      <div class="boss-meta"><span>${x.sf.versione ? ((x.sf.prove||[])[0]||{frasi:[]}).frasi.length + ' frasi a tappe' : (x.sf.prove||[]).length + ' prove'}</span><span>${tot} punti</span><span>fino a ${3 * SF.XP_STELLA} XP</span></div>
-      <div class="boss-foot">${st.some(c => c.correzione) ? CN.stelleHtml(best) : '<span class="small muted">Corretta dalla prof</span>'}<span class="btn primary sm">${cta} →</span></div></a>`);
+      <div class="boss-meta"><span>${x.sf.versione ? ((x.sf.prove||[])[0]||{frasi:[]}).frasi.length + ' frasi a tappe' : (x.sf.prove||[]).length + ' prove'}</span></div>
+      <div class="boss-foot"><span class="small muted">${last && last.stato !== 'bozza' ? 'La correzione arriva per email' : 'Corretta dalla prof'}</span><span class="btn primary sm">${cta} →</span></div></a>`);
     return el;
-  }
-  function caricaCorrezioni(s, testo){
-    let d; try{ d = JSON.parse(testo); }catch(e){ CN.toast('Il file delle correzioni non è valido.'); return; }
-    const prima = SF.riepilogo(SF.diStudente(s));
-    const n = SF.importaCorrezioni(d, s);
-    if(!n){ CN.toast('Nessuna correzione nuova per te in questo file.'); return; }
-    const dopo = SF.riepilogo(SF.diStudente(s));
-    CN.toast(n === 1 ? 'È arrivata la correzione della prof!' : `Sono arrivate ${n} correzioni della prof!`);
-    R.refresh();
-    if(dopo.xp > prima.xp) coriandoli();
   }
   function viewSfide(s, P){
     const tutteSf = SF.elenco(cat), L = tutteSf.filter(x => !x.sf.lente && !x.sf.versione), LL = tutteSf.filter(x => x.sf.lente), VV = tutteSf.filter(x => x.sf.versione);
     const R1 = SF.riepilogo(SF.diStudente(s));
     app.innerHTML = `<section class="hero"><h1>Le sfide del <span class="hl">prof</span></h1>
-      <p class="muted">Esercizi tosti, senza soluzione automatica: li corregge la tua insegnante. Ogni sfida vale fino a 3 stelle e ${3 * SF.XP_STELLA} XP.</p></section>
+      <p class="muted">Esercizi tosti, senza soluzione automatica: li corregge la tua insegnante e ti manda la correzione per email. Ogni sfida consegnata ti avvicina a una nuova medaglia.</p></section>
       <div class="steps3">
         <div><b>1</b><span><strong>Affronta</strong> le prove: le risposte si salvano da sole, puoi riprendere quando vuoi.</span></div>
         <div><b>2</b><span><strong>Consegna</strong> e manda il file alla prof (puoi anche lasciarle un messaggio).</span></div>
-        <div><b>3</b><span><strong>Ricevi il verdetto</strong>: carica il file delle correzioni e scopri stelle, punti e commento.</span></div>
+        <div><b>3</b><span><strong>Ricevi la correzione</strong> della prof per email e conquista le medaglie: 1, 3, 5 e 10 sfide.</span></div>
       </div>
-      <div class="sec-title"><h2>Le sfide</h2><span class="small muted" style="flex:1;margin-left:10px">${L.filter(x => SF.sblocco(cat, P, x.sf).ok).length} sbloccate su ${L.length}</span>${R1.corrette ? `<span class="badge ok">${R1.vinte} ${R1.vinte === 1 ? 'vinta' : 'vinte'} · +${R1.xp} XP</span>` : ''}</div>
+      <div class="sec-title"><h2>Le sfide</h2><span class="small muted" style="flex:1;margin-left:10px">${L.filter(x => SF.sblocco(cat, P, x.sf).ok).length} sbloccate su ${L.length}</span>${R1.consegnate ? `<span class="badge ok">${R1.consegnate} ${R1.consegnate === 1 ? 'consegnata' : 'consegnate'}</span>` : ''}</div>
       <div class="grid cols-2" id="L"></div>
       ${VV.length ? `<div class="sec-title" style="margin-top:26px"><h2>Versioni</h2><span class="small muted" style="flex:1;margin-left:10px">si traduce una frase alla volta, con l'aiuto che cala · ${VV.filter(x => SF.sblocco(cat, P, x.sf).ok).length} sbloccate su ${VV.length}</span></div><div class="grid cols-2" id="VV"></div>` : ''}
       ${LL.length ? `<div class="sec-title" style="margin-top:26px"><h2>Sotto la lente</h2><span class="small muted" style="flex:1;margin-left:10px">prove brevi alla fine degli argomenti più importanti, sempre disponibili</span></div><div class="grid cols-2" id="LL"></div>` : ''}
-      <div class="card flat" style="margin-top:22px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
-        <div style="flex:1;min-width:220px"><h3>Hai ricevuto le correzioni?</h3><p class="muted small" style="margin:0">Carica il file che ti ha mandato la prof: stelle, punti e commenti compaiono qui.</p></div>
-        <div class="btn-row"><label class="btn primary" style="cursor:pointer">Carica il file<input type="file" id="cf" accept=".json,application/json" hidden></label><button class="btn" id="cp">Incolla il testo</button></div></div>`;
+      <div class="sec-title" style="margin-top:26px"><h2>Le tue medaglie</h2><a class="small" href="#/traguardi">tutti i traguardi →</a></div>${CN.medaglieSfide(P)}`;
     const box = app.querySelector('#L');
     if(!L.length) box.innerHTML = '<p class="muted">Ancora nessuna sfida: arriveranno presto.</p>';
     L.forEach(x => box.appendChild(cartaSfida(s, x, P)));
     VV.forEach(x => app.querySelector('#VV').appendChild(cartaSfida(s, x, P)));
     LL.forEach(x => app.querySelector('#LL').appendChild(cartaSfida(s, x, P)));
-    app.querySelector('#cf').onchange = async e => { const f = e.target.files[0]; if(f) caricaCorrezioni(s, await f.text()); };
-    app.querySelector('#cp').onclick = () => {
-      const bg = CN.h(`<div class="modal-bg"><div class="modal" style="max-width:560px"><h3>Incolla le correzioni</h3><p class="muted small">Incolla qui il testo che ti ha mandato la prof.</p><textarea class="code" style="min-height:160px"></textarea><div class="btn-row" style="justify-content:flex-end;margin-top:12px"><button class="btn ghost" data-no>Annulla</button><button class="btn primary" data-ok>Carica</button></div></div></div>`);
-      document.body.appendChild(bg);
-      bg.querySelector('[data-no]').onclick = () => bg.remove();
-      bg.querySelector('[data-ok]').onclick = () => { const t = bg.querySelector('textarea').value; bg.remove(); caricaCorrezioni(s, t); };
-    };
   }
   function viewSfida(s, P, id){
     const x = SF.elenco(cat).find(y => y.id === id);
     if(!x) return R.go('/sfide');
-    const sf = x.sf, tot = SF.totPunti(sf);
+    const sf = x.sf;
     const st = SF.storia(s, id);
     if(!st.length && !SF.sblocco(cat, P, sf).ok){ CN.toast('Questa sfida non è ancora sbloccata.'); return R.go('/sfide'); }
     let c = st[st.length - 1];
     const nuova = !c;
     if(!c) c = SF.nuovaBozza(s, x);
     const edit = c.stato === 'bozza';
-    const corr = c.correzione;
-    const prec = st.filter(y => y.id !== c.id && y.correzione);
     const argL = sf.lente && CN.indice(cat).arg.get(sf.argomento);
     app.innerHTML = `<div class="crumbs">${argL ? `<a href="#/a/${argL.m.id}/${argL.s.id}/${argL.a.id}">${esc(argL.a.titolo)}</a> › <span>Sotto la lente</span>` : `<a href="#/sfide">Sfide</a> › <span>${esc(x.where)}</span>`}</div>
       <section class="card boss-head"><span class="stamp big">${esc(sf.livello || 'Sfida')}</span>
         <h1>${esc(sf.titolo)}</h1>
-        <div class="boss-meta"><span>${esc(x.where)}</span><span>${(sf.prove||[]).length} prove</span><span>${tot} punti</span><span>fino a ${3 * SF.XP_STELLA} XP</span>${c.tentativo > 1 ? `<span>tentativo ${c.tentativo}</span>` : ''}</div>
+        <div class="boss-meta"><span>${esc(x.where)}</span><span>${(sf.prove||[]).length} prove</span>${c.tentativo > 1 ? `<span>tentativo ${c.tentativo}</span>` : ''}</div>
         <div class="teoria intro">${sf.intro || ''}</div></section>
       <div id="stato"></div><div id="prove"></div><div id="fondo"></div>`;
     const stato = app.querySelector('#stato'), prove = app.querySelector('#prove'), fondo = app.querySelector('#fondo');
-    if(corr){
-      const pt = (corr.punti||[]).reduce((t, v) => t + (+v||0), 0);
-      stato.innerHTML = `<div class="card verdetto"><div class="small" style="font-weight:800;text-transform:uppercase;letter-spacing:.06em">Il verdetto della prof</div>
-        ${CN.stelleHtml(+corr.stelle||0, true)}<div class="score-big">${pt}<span class="muted" style="font-size:.45em"> / ${tot}</span></div>
-        <h2 style="margin:4px 0 0">${['Caso non ancora risolto: riprova!', 'Caso risolto!', 'Ottimo lavoro, detective!', 'Caso chiuso a pieni voti!'][+corr.stelle||0]}</h2>
-        ${+corr.stelle ? `<div class="xp-gain">+${(+corr.stelle) * SF.XP_STELLA} XP</div>` : ''}
-        ${corr.generale ? `<div class="nota-prof"><b>La prof ti scrive:</b> ${esc(corr.generale)}</div>` : ''}
-        ${prec.length ? `<p class="small muted" style="margin:10px 0 0">Tentativi precedenti: ${prec.map(y => `${y.tentativo}° ${'★'.repeat(+y.correzione.stelle||0) || '0★'}`).join(' · ')}</p>` : ''}</div>`;
-    } else if(c.stato === 'inviata'){
-      stato.innerHTML = `<div class="notice"><b>Consegnata il ${dataBreve(c.inviata)}.</b> Ora tocca alla prof: quando ti manda il file delle correzioni, caricalo nella pagina <a href="#/sfide">Sfide</a>. Se non le hai ancora mandato il file, <a href="#" id="redl">mandalo di nuovo</a>.</div>`;
+    if(c.stato !== 'bozza'){
+      stato.innerHTML = `<div class="notice"><b>Consegnata il ${dataBreve(c.inviata)}.</b> La prof la correggerà e ti manderà la correzione per email. Se non le hai ancora mandato il file, <a href="#" id="redl">mandalo di nuovo</a>.</div>`;
       stato.querySelector('#redl').onclick = e => { e.preventDefault(); inviaAllaProf(s, sf.titolo); };
     }
     let timer = null;
     const salva = () => { clearTimeout(timer); timer = setTimeout(() => { c.salvata = new Date().toISOString(); SF.salvaConsegna(c); const t = app.querySelector('#saved'); if(t) t.textContent = 'Bozza salvata alle ' + new Date().toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'}); }, 300); };
     (sf.prove||[]).forEach((p, i) => {
       c.risposte[i] = c.risposte[i] || {};
-      const card = CN.h(`<section class="card prova"><div class="prova-h"><span class="pn">Prova ${i + 1}</span><span class="badge">${esc(SF.TIPI_PROVA[p.tipo] || p.tipo)}</span><span class="badge">${p.punti} punti</span></div>
+      const card = CN.h(`<section class="card prova"><div class="prova-h"><span class="pn">Prova ${i + 1}</span><span class="badge">${esc(SF.TIPI_PROVA[p.tipo] || p.tipo)}</span></div>
         <h2>${esc(p.titolo || '')}</h2><div class="ex-q">${p.consegna || ''}</div></section>`);
       card.appendChild(SF.renderProva(p, c.risposte[i], edit ? 'edit' : 'view', salva));
-      if(corr) card.insertAdjacentHTML('beforeend', `<div class="nota-prof"><b>Prof: ${(corr.punti||[])[i] ?? 0} / ${p.punti} punti.</b> ${esc((corr.commenti||[])[i] || '')}</div>`);
       prove.appendChild(card);
     });
     if(edit){
@@ -528,27 +496,29 @@
       fondo.querySelector('#send').onclick = async () => {
         const manca = SF.mancanti(sf, c.risposte);
         const msg = manca.length ? `${manca.length === 1 ? 'La prova ' + manca[0] + ' sembra incompleta' : 'Le prove ' + manca.join(', ') + ' sembrano incomplete'}. Vuoi consegnare lo stesso?`
-          : 'Dopo la consegna non potrai più cambiare le risposte (potrai migliorarle dopo la correzione). Consegni?';
+          : 'Dopo la consegna non potrai più cambiare le risposte (dopo la correzione della prof potrai rimandarla). Consegni?';
         if(!await CN.conferma(msg, 'Consegna')) return;
         clearTimeout(timer);
         c.stato = 'inviata'; c.inviata = new Date().toISOString(); SF.salvaConsegna(c);
         R.refresh();
         inviaAllaProf(s, sf.titolo);
       };
-    } else if(corr && (+corr.stelle||0) < 3){
-      fondo.innerHTML = `<div class="card flat" style="margin-top:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><h3>Vuoi più stelle?</h3><p class="muted small" style="margin:0">Leggi i commenti della prof, correggi le tue risposte e rimanda la sfida. Conta il tentativo migliore.</p></div><button class="btn accent" id="again">Migliora e rinvia</button></div>`;
+    } else {
+      fondo.innerHTML = `<div class="card flat" style="margin-top:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><h3>Hai ricevuto la correzione?</h3><p class="muted small" style="margin:0">Se la prof te lo chiede, puoi correggere le tue risposte e rimandare la sfida.</p></div><button class="btn accent" id="again">Correggi e rinvia</button></div>`;
       fondo.querySelector('#again').onclick = () => { const b = SF.nuovaBozza(s, x, c); SF.salvaConsegna(b); R.refresh(); window.scrollTo(0, 0); };
     }
   }
 
   /* ---------- Traguardi ---------- */
   function viewTraguardi(s, P){
-    const si = P.badge.filter(b => b.ok), no = P.badge.filter(b => !b.ok).sort((a,b) => b.cur/b.tot - a.cur/a.tot);
+    const altri = P.badge.filter(b => b.gruppo !== 'sfide');
+    const si = altri.filter(b => b.ok), no = altri.filter(b => !b.ok).sort((a,b) => b.cur/b.tot - a.cur/a.tot);
     app.innerHTML = `<section class="hero"><h1><span class="hl">Traguardi</span></h1><p class="muted">Ogni allenamento vale punti esperienza. Con i punti sali di livello, con la costanza conquisti gli adesivi.</p></section>
       <div class="grid cols-2">${cartaLivello(P)}
         <div class="card"><h3>Come si guadagnano i punti</h3><ul class="small" style="margin:6px 0 0;padding-left:18px"><li>10 XP per ogni esercizio giusto</li><li>20 XP in più la prima volta che fai 100% in un'attività</li><li>Rifare un'attività vale punti pieni solo se batti il tuo record; altrimenti un quarto</li><li>Nel ripasso: 10 XP per esercizio giusto, 2 se l'hai già azzeccato oggi</li></ul>
         <div class="small muted" style="margin-top:8px">Livelli: ${CN.LIVELLI.map((l, i) => i + 1 === P.livello.n ? `<b>${l[1]}</b>` : l[1]).join(' → ')}</div></div></div>
-      <div class="sec-title"><h2>Ottenuti</h2><span class="badge ok">${si.length} di ${P.badge.length}</span></div>
+      <div class="sec-title"><h2>Medaglie delle sfide</h2><span class="small muted">${P.sfide.consegnate} ${P.sfide.consegnate === 1 ? 'sfida consegnata' : 'sfide consegnate'}</span></div>${CN.medaglieSfide(P)}
+      <div class="sec-title"><h2>Ottenuti</h2><span class="badge ok">${si.length} di ${altri.length}</span></div>
       ${si.length ? `<div class="trags">${si.map(b => CN.adesivo(b)).join('')}</div>` : '<p class="muted">Ancora nessuno: il primo arriva completando un allenamento.</p>'}
       ${no.length ? `<div class="sec-title"><h2>Da conquistare</h2></div><div class="trags">${no.map(b => CN.adesivo(b)).join('')}</div>` : ''}`;
   }

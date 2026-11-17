@@ -567,7 +567,6 @@
   // sul computer scarica il file e apre una nuova email già indirizzata alla prof.
   function inviaAllaProf(s, sfida){
     const f = fileProgressi(s);
-    const email = String((cat.impostazioni || {}).emailProf || '').trim();
     const oggetto = `Carpe Notes · ${s.nome} (${s.classe})` + (sfida ? ` · sfida «${sfida}»` : ' · progressi');
     const corpo = `Ciao prof,\n${sfida ? `ho consegnato la sfida «${sfida}». ` : ''}Ti mando il file con tutti i miei progressi su Carpe Notes.\n\n${s.nome}, ${s.classe}`;
     let file = null;
@@ -575,26 +574,23 @@
     const telefono = window.matchMedia && matchMedia('(pointer: coarse)').matches;
     const condividi = !!(telefono && file && navigator.canShare && navigator.canShare({files: [file]}));
     const scarica = () => { try{ const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([f.testo], {type: 'text/plain'})); a.download = f.nome; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }catch(e){ CN.download(f.nome, f.testo, 'text/plain'); } };
-    const mailto = () => { location.href = `mailto:${encodeURIComponent(email).replace(/%40/g, '@')}?subject=${encodeURIComponent(oggetto)}&body=${encodeURIComponent(corpo + '\n\n(Allego il file ' + f.nome + ')')}`; };
+    const mailto = () => { location.href = `mailto:?subject=${encodeURIComponent(oggetto)}&body=${encodeURIComponent(corpo + '\n\n(Allego il file ' + f.nome + ')')}`; };
     const bg = CN.modale(`<h3>${sfida ? 'Sfida consegnata! Ora mandala alla prof' : 'Manda i tuoi progressi alla prof'}</h3>
       <p class="muted small">Nel file ci sono tutti i progressi salvati su questo dispositivo${sfida ? ', compresa la sfida che hai appena consegnato' : ''}. La prof lo apre nella sua area e ${sfida ? 'ti manda la correzione' : 'vede andamento e traguardi'}.</p>
-      ${email ? `<p class="small" style="margin:8px 0">Indirizzo della prof: <b>${esc(email)}</b> <button class="btn sm ghost" data-copia>Copia</button></p>` : ''}
-      <p class="small" id="passo" style="margin:8px 0">${condividi ? 'Tocca «Invia per email» e scegli Mail o Gmail: il file è già allegato' + (email ? ', scrivi l\'indirizzo della prof e invia.' : '. Scrivi l\'indirizzo della prof e invia.') : 'Premi «Invia per email»: il file si scarica e si apre una nuova email' + (email ? ' già indirizzata alla prof' : '') + '. Allega il file (lo trovi in Download) e premi Invia.'}</p>
+      <p class="small" id="passo" style="margin:8px 0">${condividi ? 'Tocca «Invia per email» e scegli Mail o Gmail: il file è già allegato. Scrivi l\'indirizzo della prof e invia.' : 'Premi «Invia per email»: il file si scarica e si apre una nuova email. Scrivi l\'indirizzo della prof, allega il file (lo trovi in Download) e premi Invia.'}</p>
       <p class="hint" style="margin:4px 0 0">Nome del file: ${esc(f.nome)}</p>
       <div class="btn-row" style="justify-content:flex-end;margin-top:14px"><button class="btn ghost" data-chiudi>${sfida ? 'Lo mando dopo' : 'Chiudi'}</button><button class="btn" data-scarica>Scarica il file</button><button class="btn primary" data-invia>Invia per email</button></div>`);
     const chiudi = () => bg.remove();
     bg.querySelector('[data-chiudi]').onclick = chiudi;
     bg.onclick = e => { if(e.target === bg) chiudi(); };
     bg.querySelector('[data-scarica]').onclick = () => { scarica(); CN.toast('File scaricato: allegalo a un\'email per la prof'); };
-    const cp = bg.querySelector('[data-copia]');
-    if(cp) cp.onclick = () => { try{ navigator.clipboard.writeText(email).then(() => CN.toast('Indirizzo copiato')); }catch(e){} };
     bg.querySelector('[data-invia]').onclick = async () => {
       if(condividi){
         try{ await navigator.share({files: [file], title: oggetto, text: corpo}); chiudi(); CN.toast('Fatto! Controlla che l\'email sia partita.'); return; }
         catch(e){ if(e && e.name === 'AbortError') return; }
       }
       scarica(); mailto();
-      bg.querySelector('#passo').innerHTML = `<b>Ultimo passo:</b> nell'email che si è aperta allega il file <b>${esc(f.nome)}</b> (è nella cartella Download) e premi Invia. Se l'email non si è aperta, scrivi tu alla prof${email ? ' (' + esc(email) + ')' : ''} e allega il file.`;
+      bg.querySelector('#passo').innerHTML = `<b>Ultimo passo:</b> nell'email che si è aperta scrivi l'indirizzo della prof, allega il file <b>${esc(f.nome)}</b> (è nella cartella Download) e premi Invia. Se l'email non si è aperta, scrivi tu alla prof e allega il file.`;
     };
   }
   function viewProgressi(s, P){

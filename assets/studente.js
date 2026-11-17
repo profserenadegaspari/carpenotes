@@ -507,8 +507,8 @@
         ${corr.generale ? `<div class="nota-prof"><b>La prof ti scrive:</b> ${esc(corr.generale)}</div>` : ''}
         ${prec.length ? `<p class="small muted" style="margin:10px 0 0">Tentativi precedenti: ${prec.map(y => `${y.tentativo}° ${'★'.repeat(+y.correzione.stelle||0) || '0★'}`).join(' · ')}</p>` : ''}</div>`;
     } else if(c.stato === 'inviata'){
-      stato.innerHTML = `<div class="notice"><b>Consegnata il ${dataBreve(c.inviata)}.</b> Ora tocca alla prof: quando ti manda il file delle correzioni, caricalo nella pagina <a href="#/sfide">Sfide</a>. Se non le hai ancora mandato il file, <a href="#" id="redl">scaricalo di nuovo</a>.</div>`;
-      stato.querySelector('#redl').onclick = e => { e.preventDefault(); esporta(s); };
+      stato.innerHTML = `<div class="notice"><b>Consegnata il ${dataBreve(c.inviata)}.</b> Ora tocca alla prof: quando ti manda il file delle correzioni, caricalo nella pagina <a href="#/sfide">Sfide</a>. Se non le hai ancora mandato il file, <a href="#" id="redl">mandalo di nuovo</a>.</div>`;
+      stato.querySelector('#redl').onclick = e => { e.preventDefault(); inviaAllaProf(s, sf.titolo); };
     }
     let timer = null;
     const salva = () => { clearTimeout(timer); timer = setTimeout(() => { c.salvata = new Date().toISOString(); SF.salvaConsegna(c); const t = app.querySelector('#saved'); if(t) t.textContent = 'Bozza salvata alle ' + new Date().toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'}); }, 300); };
@@ -532,10 +532,8 @@
         if(!await CN.conferma(msg, 'Consegna')) return;
         clearTimeout(timer);
         c.stato = 'inviata'; c.inviata = new Date().toISOString(); SF.salvaConsegna(c);
-        esporta(s);
-        CN.toast('Fascicolo consegnato! Manda il file alla prof.');
-        const bg = document.querySelector('.modal-bg'); const done = () => R.refresh();
-        if(bg){ const obs = new MutationObserver(() => { if(!document.body.contains(bg)){ obs.disconnect(); done(); } }); obs.observe(document.body, {childList: true}); } else done();
+        R.refresh();
+        inviaAllaProf(s, sf.titolo);
       };
     } else if(corr && (+corr.stelle||0) < 3){
       fondo.innerHTML = `<div class="card flat" style="margin-top:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><h3>Vuoi più stelle?</h3><p class="muted small" style="margin:0">Leggi i commenti della prof, correggi le tue risposte e rimanda la sfida. Conta il tentativo migliore.</p></div><button class="btn accent" id="again">Migliora e rinvia</button></div>`;
@@ -556,14 +554,53 @@
   }
 
   /* ---------- Progressi ---------- */
-  function esporta(s){
-    const data = {tipo: 'carpe-notes-risultati', versione: 3, studente: s, esportato: new Date().toISOString(), risultati: CN.risultatiStudente(s), sfide: CN.sfide.inviate(s)};
-    CN.download(`risultati_${s.classe}_${s.nome}`.replace(/[^\w-]+/g, '_') + '.json', JSON.stringify(data, null, 1));
+  // Il file con TUTTI i progressi salvati su questo dispositivo (allenamenti, ripasso, sfide consegnate).
+  // È un .txt (con dentro i dati) perché i telefoni lo condividono senza problemi con Mail e Gmail.
+  function fileProgressi(s){
+    const ora = new Date();
+    const data = {tipo: 'carpe-notes-risultati', versione: 3, studente: {nome: s.nome, classe: s.classe}, esportato: ora.toISOString(), risultati: CN.risultatiStudente(s), sfide: CN.sfide.inviate(s)};
+    const nome = `CarpeNotes_${s.classe}_${s.nome}_${ora.toISOString().slice(0, 10)}`.replace(/[^\w-]+/g, '_') + '.txt';
+    return {nome, testo: JSON.stringify(data, null, 1)};
+  }
+  const esporta = s => inviaAllaProf(s);
+  // Finestra «Manda alla prof»: sul telefono apre la condivisione (Mail, Gmail…) con il file già allegato;
+  // sul computer scarica il file e apre una nuova email già indirizzata alla prof.
+  function inviaAllaProf(s, sfida){
+    const f = fileProgressi(s);
+    const email = String((cat.impostazioni || {}).emailProf || '').trim();
+    const oggetto = `Carpe Notes · ${s.nome} (${s.classe})` + (sfida ? ` · sfida «${sfida}»` : ' · progressi');
+    const corpo = `Ciao prof,\n${sfida ? `ho consegnato la sfida «${sfida}». ` : ''}Ti mando il file con tutti i miei progressi su Carpe Notes.\n\n${s.nome}, ${s.classe}`;
+    let file = null;
+    try{ file = new File([f.testo], f.nome, {type: 'text/plain'}); }catch(e){}
+    const telefono = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+    const condividi = !!(telefono && file && navigator.canShare && navigator.canShare({files: [file]}));
+    const scarica = () => { try{ const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([f.testo], {type: 'text/plain'})); a.download = f.nome; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }catch(e){ CN.download(f.nome, f.testo, 'text/plain'); } };
+    const mailto = () => { location.href = `mailto:${encodeURIComponent(email).replace(/%40/g, '@')}?subject=${encodeURIComponent(oggetto)}&body=${encodeURIComponent(corpo + '\n\n(Allego il file ' + f.nome + ')')}`; };
+    const bg = CN.modale(`<h3>${sfida ? 'Sfida consegnata! Ora mandala alla prof' : 'Manda i tuoi progressi alla prof'}</h3>
+      <p class="muted small">Nel file ci sono tutti i progressi salvati su questo dispositivo${sfida ? ', compresa la sfida che hai appena consegnato' : ''}. La prof lo apre nella sua area e ${sfida ? 'ti manda la correzione' : 'vede andamento e traguardi'}.</p>
+      ${email ? `<p class="small" style="margin:8px 0">Indirizzo della prof: <b>${esc(email)}</b> <button class="btn sm ghost" data-copia>Copia</button></p>` : ''}
+      <p class="small" id="passo" style="margin:8px 0">${condividi ? 'Tocca «Invia per email» e scegli Mail o Gmail: il file è già allegato' + (email ? ', scrivi l\'indirizzo della prof e invia.' : '. Scrivi l\'indirizzo della prof e invia.') : 'Premi «Invia per email»: il file si scarica e si apre una nuova email' + (email ? ' già indirizzata alla prof' : '') + '. Allega il file (lo trovi in Download) e premi Invia.'}</p>
+      <p class="hint" style="margin:4px 0 0">Nome del file: ${esc(f.nome)}</p>
+      <div class="btn-row" style="justify-content:flex-end;margin-top:14px"><button class="btn ghost" data-chiudi>${sfida ? 'Lo mando dopo' : 'Chiudi'}</button><button class="btn" data-scarica>Scarica il file</button><button class="btn primary" data-invia>Invia per email</button></div>`);
+    const chiudi = () => bg.remove();
+    bg.querySelector('[data-chiudi]').onclick = chiudi;
+    bg.onclick = e => { if(e.target === bg) chiudi(); };
+    bg.querySelector('[data-scarica]').onclick = () => { scarica(); CN.toast('File scaricato: allegalo a un\'email per la prof'); };
+    const cp = bg.querySelector('[data-copia]');
+    if(cp) cp.onclick = () => { try{ navigator.clipboard.writeText(email).then(() => CN.toast('Indirizzo copiato')); }catch(e){} };
+    bg.querySelector('[data-invia]').onclick = async () => {
+      if(condividi){
+        try{ await navigator.share({files: [file], title: oggetto, text: corpo}); chiudi(); CN.toast('Fatto! Controlla che l\'email sia partita.'); return; }
+        catch(e){ if(e && e.name === 'AbortError') return; }
+      }
+      scarica(); mailto();
+      bg.querySelector('#passo').innerHTML = `<b>Ultimo passo:</b> nell'email che si è aperta allega il file <b>${esc(f.nome)}</b> (è nella cartella Download) e premi Invia. Se l'email non si è aperta, scrivi tu alla prof${email ? ' (' + esc(email) + ')' : ''} e allega il file.`;
+    };
   }
   function viewProgressi(s, P){
     app.innerHTML = `<section class="hero"><h1>I miei <span class="hl">progressi</span></h1><p class="muted">Livello ${P.livello.n} · ${P.livello.nome} · ${P.xp} XP · ${P.badge.filter(b => b.ok).length} traguardi</p></section>
       <div id="an"></div>
-      <div class="card flat" style="margin-top:22px;display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><h3>Mostra i progressi alla tua insegnante</h3><p class="muted small" style="margin:0">La docente vede queste stesse statistiche quando le consegni il file dei risultati.</p></div><button class="btn primary" id="exp">Scarica il file dei risultati</button></div>`;
+      <div class="card flat" style="margin-top:22px;display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><h3>Mostra i progressi alla tua insegnante</h3><p class="muted small" style="margin:0">La docente vede queste stesse statistiche quando le consegni il file dei risultati.</p></div><button class="btn primary" id="exp">Manda i progressi alla prof</button></div>`;
     CN.renderAnalitiche(app.querySelector('#an'), CN.risultatiStudente(s), cat, CN.sfide.diStudente(s));
     app.querySelector('#exp').onclick = () => esporta(s);
   }
@@ -575,8 +612,8 @@
       <h1>${esc(s.nome)} <span class="muted" style="font-size:.55em">${esc(s.classe)}</span></h1>
       <div class="card" style="margin:16px 0">
         <h3>Consegna i risultati alla docente</h3>
-        <p class="muted small">I tuoi progressi sono salvati solo su questo dispositivo. Scarica il file e consegnalo alla tua insegnante: lei lo carica nella sua area e vede andamento e traguardi.</p>
-        <div class="btn-row"><button class="btn primary" id="exp">Scarica il file dei risultati</button><button class="btn ghost danger" id="out">Cambia studente</button></div>
+        <p class="muted small">I tuoi progressi sono salvati solo su questo dispositivo. Mandali per email alla tua insegnante: lei apre il file nella sua area e vede andamento e traguardi.</p>
+        <div class="btn-row"><button class="btn primary" id="exp">Manda i progressi alla prof</button><button class="btn ghost danger" id="out">Cambia studente</button></div>
       </div>
       <div class="sec-title"><h2>Tutti gli allenamenti</h2></div>
       ${rs.length ? `<div class="tbl-wrap"><table class="tbl"><tr><th>Data</th><th>Allenamento</th><th>Punteggio</th><th>Corrette</th><th>XP</th></tr>

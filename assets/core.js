@@ -340,5 +340,5 @@
 
   window.CN = { K, load, save, del, clone, uid, esc, norm, shuffle, catalog, fileCatalog, hasLocalCatalog, saveCatalog, resetCatalog, findArg,
     studente, setStudente, maiuscole, anteprima, entraAnteprima, pinDocente, logoutStudente, studKey, risultati, addRisultato, risultatiStudente, migliore, tuttiRisultati, importaRisultati, cancellaRisultati,
-    download, conferma, chiedi, toast, h, TIPI, renderEsercizio, parseIndividua, etichetteDi };
+    download, modale, conferma, chiedi, toast, h, TIPI, renderEsercizio, parseIndividua, etichetteDi };
 })();

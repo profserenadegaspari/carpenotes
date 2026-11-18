@@ -6,6 +6,9 @@
      errori   {titolo, consegna, testo (*parola* = errore), punti, guida}  tocca le parole sbagliate e scrive la correzione (senza spiegazione)
      motiva   {titolo, consegna, domanda, opzioni[], punti, guida}         sceglie la risposta giusta (senza spiegazione)
      scrivi   {titolo, consegna, vincoli[], minParole, punti, guida}       testo libero con vincoli da rispettare
+     mossa    {titolo, consegna, frasi: [{f, obiettivo}], punti, guida}     in ogni frase cambia UNA parola (la tocca e scrive quella nuova) per raggiungere l'obiettivo
+     frase    {titolo, consegna, vincoli[], maxParole, punti, guida}       «Tutto in una frase»: una sola frase breve che contiene tutti i vincoli
+     tessere  {titolo, consegna, voci: [{testo, compito?, tessere[], soluzione}], punti, guida}  compone la frase toccando le tessere (alcune sono trappole)
      versione {titolo, consegna, categorie, frasi: [{la ('[parola|cat]'), aiuto (completo|indizi|lessico|libera), aiuto_testo?, domanda?: [q, [giusta, …]], lex?, modello, punti?}], punti, guida}
               versione a tappe: per ogni frase colora, rispondi, traduci (sfida con versione:true: sezione «Versioni»)
    Il percorso: bozza (salvata da sola) → inviata (va nel file dei risultati). Niente punti né stelle: si contano le sfide consegnate
@@ -295,6 +298,72 @@
       if(ro && String(ans.testo || '').trim()) box.insertAdjacentHTML('beforeend', `<div class="risposta">${esc(ans.testo)}</div>`);
     }
 
+    else if(p.tipo === 'mossa'){
+      // Una mossa sola: in ogni frase si cambia UNA parola (si tocca e si scrive quella nuova) per raggiungere l'obiettivo
+      ans.m = ans.m || [];
+      const pezzi = f => parole(f).map(x => { const m = /^([«“(]*)(.*?)([.,;:!?»”)]*)$/.exec(x); return {pre: m[1], w: m[2], post: m[3]}; });
+      (p.frasi||[]).forEach((v, k) => {
+        const ws = pezzi(v.f);
+        const li = CN.h(`<div class="mossa"><div class="rs-c">Obiettivo: ${v.obiettivo}</div><div class="frase"></div><div class="mossa-in"></div></div>`);
+        const fr = li.querySelector('.frase'), inn = li.querySelector('.mossa-in');
+        function disegna(){
+          const a = ans.m[k];
+          fr.innerHTML = '';
+          ws.forEach((x, j) => {
+            const cambiata = a && a.i === j;
+            let el;
+            if(ro){ el = document.createElement('span'); el.className = 'pick' + (cambiata ? ' sel' : '');
+              el.innerHTML = cambiata ? `<s class="muted">${esc(x.w)}</s> ${esc(a.n || '…')}` : esc(x.w); }
+            else { el = document.createElement('button'); el.type = 'button'; el.className = 'pick' + (cambiata ? ' sel' : '');
+              el.textContent = cambiata && a.n ? a.n : x.w;
+              el.onclick = () => { ans.m[k] = cambiata ? null : {i: j, n: ''}; ch(); disegna(); const t = inn.querySelector('input'); if(t) t.focus(); }; }
+            if(x.pre) fr.appendChild(document.createTextNode(x.pre));
+            fr.appendChild(el);
+            if(x.post) fr.appendChild(document.createTextNode(x.post));
+          });
+          inn.innerHTML = '';
+          if(ro){ if(!a) inn.innerHTML = '<span class="small muted">Nessuna parola cambiata.</span>'; return; }
+          if(!a){ inn.innerHTML = '<span class="small muted">Tocca la parola da cambiare.</span>'; return; }
+          const t = CN.h(`<input type="text" placeholder="al posto di «${esc(ws[a.i].w)}» scrivo…" aria-label="Nuova parola al posto di ${esc(ws[a.i].w)}">`);
+          t.value = a.n || '';
+          t.oninput = () => { a.n = t.value; fr.querySelectorAll('.pick')[a.i].textContent = t.value || ws[a.i].w; ch(); };
+          inn.appendChild(t);
+        }
+        disegna(); box.appendChild(li);
+      });
+      if(!ro) box.insertAdjacentHTML('afterbegin', `<div class="hint">Una sola parola per frase: toccala e scrivi quella nuova. Toccala di nuovo per annullare.</div>`);
+    }
+
+    else if(p.tipo === 'tessere'){
+      // Tessere: si compone la frase toccando le tessere nell'ordine giusto; alcune sono trappole e restano fuori
+      ans.t = ans.t || [];
+      const norm = s => String(s||'').toLowerCase().replace(/[«»"“”.,;:!?()]/g, '').replace(/\s+/g, ' ').trim();
+      (p.voci||[]).forEach((v, k) => {
+        const li = CN.h(`<div class="mossa"><div class="rs-t">${v.testo}</div>${v.compito ? `<div class="rs-c">${v.compito}</div>` : ''}<div class="frase tess-riga"></div><div class="pills tess-mazzo"></div></div>`);
+        const fr = li.querySelector('.tess-riga'), mz = li.querySelector('.tess-mazzo');
+        function disegna(){
+          const us = ans.t[k] = (ans.t[k] || []).filter(j => j < v.tessere.length);
+          fr.innerHTML = us.length ? '' : `<span class="small muted">${ro ? 'Nessuna tessera usata.' : 'Tocca le tessere qui sotto, nell\'ordine giusto…'}</span>`;
+          us.forEach((j, n) => {
+            const b = document.createElement(ro ? 'span' : 'button'); if(!ro) b.type = 'button';
+            b.className = 'pick sel'; b.textContent = v.tessere[j];
+            if(!ro) b.onclick = () => { us.splice(n, 1); ch(); disegna(); };
+            fr.appendChild(b);
+          });
+          mz.innerHTML = '';
+          if(ro){
+            if(mode === 'doc' && v.soluzione){ const ok = norm(us.map(j => v.tessere[j]).join(' ')) === norm(v.soluzione);
+              mz.innerHTML = `<span class="small ${ok ? '' : 'muted'}" style="${ok ? 'color:var(--ok);font-weight:800' : ''}">${ok ? '✓ uguale alla soluzione' : '✗ soluzione: ' + esc(v.soluzione)}</span>`; }
+            return;
+          }
+          v.tessere.forEach((x, j) => { if(us.includes(j)) return;
+            const b = CN.h(`<button type="button" class="pill">${esc(x)}</button>`); b.onclick = () => { us.push(j); ch(); disegna(); }; mz.appendChild(b); });
+        }
+        disegna(); box.appendChild(li);
+      });
+      if(!ro) box.insertAdjacentHTML('afterbegin', `<div class="hint">Tocca una tessera per metterla nella frase, toccala di nuovo nella frase per toglierla. Non tutte le tessere servono.</div>`);
+    }
+
     else if(p.tipo === 'riscrivi'){
       ans.r = ans.r || [];
       const ol = CN.h(`<ol class="riscr"></ol>`);
@@ -307,12 +376,15 @@
       box.appendChild(ol);
     }
 
-    else if(p.tipo === 'scrivi'){
+    else if(p.tipo === 'scrivi' || p.tipo === 'frase'){
+      // frase = «Tutto in una frase»: una sola frase, al massimo maxParole parole
       ans.check = ans.check || [];
       const conta = CN.h(`<div class="small muted wc"></div>`);
-      const upd = () => { const n = nParole(ans.testo); conta.innerHTML = `${n} parole${p.minParole ? ` · minimo ${p.minParole}` : ''}${p.minParole && n < p.minParole ? '' : p.minParole ? ' ✓' : ''}`; };
+      const upd = () => { const n = nParole(ans.testo);
+        if(p.maxParole){ conta.innerHTML = `${n} parole · massimo ${p.maxParole}${n > p.maxParole ? ' · <b style="color:var(--ko)">troppe</b>' : n ? ' ✓' : ''}`; return; }
+        conta.innerHTML = `${n} parole${p.minParole ? ` · minimo ${p.minParole}` : ''}${p.minParole && n < p.minParole ? '' : p.minParole ? ' ✓' : ''}`; };
       if(ro) box.insertAdjacentHTML('beforeend', `<div class="risposta">${esc(ans.testo || '') || '<span class="muted">Nessun testo.</span>'}</div>`);
-      else { const ta = CN.h(`<textarea rows="9" placeholder="Scrivi qui…"></textarea>`); ta.value = ans.testo || ''; ta.oninput = () => { ans.testo = ta.value; upd(); ch(); }; box.appendChild(ta); }
+      else { const ta = CN.h(p.tipo === 'frase' ? `<textarea rows="3" placeholder="Scrivi qui la tua frase"></textarea>` : `<textarea rows="9" placeholder="Scrivi qui…"></textarea>`); ta.value = ans.testo || ''; ta.oninput = () => { ans.testo = ta.value; upd(); ch(); }; box.appendChild(ta); }
       box.appendChild(conta); upd();
       const vl = CN.h(`<div class="vincoli"><div class="f">${ro ? 'Elementi che lo studente dichiara di aver inserito' : 'Spunta ogni elemento quando l\'hai inserito'}</div></div>`);
       (p.vincoli||[]).forEach((v, i) => {
@@ -322,6 +394,9 @@
       });
       box.appendChild(vl);
     }
+    // consegne fatte quando la prova era ancora una riscrittura: le vecchie risposte si leggono lo stesso
+    if(ro && ['mossa','tessere','frase'].includes(p.tipo) && Array.isArray(ans.r) && ans.r.some(x => String(x||'').trim()))
+      box.insertAdjacentHTML('beforeend', `<div class="risposta"><b>Risposte date alla versione precedente della prova</b>\n${ans.r.map((x, i) => (i + 1) + '. ' + esc(x||'—')).join('\n')}</div>`);
     return box;
   }
 
@@ -335,6 +410,9 @@
       if(p.tipo === 'errori') ok = Object.keys(a.sel||{}).length > 0;
       if(p.tipo === 'motiva') ok = a.scelta !== undefined;
       if(p.tipo === 'scrivi') ok = nParole(a.testo) >= (p.minParole || 1);
+      if(p.tipo === 'frase') ok = nParole(a.testo) >= 1 && nParole(a.testo) <= (p.maxParole || 99);
+      if(p.tipo === 'mossa') ok = (p.frasi||[]).every((f, j) => { const m = (a.m||[])[j]; return m && String(m.n||'').trim(); });
+      if(p.tipo === 'tessere') ok = (p.voci||[]).every((v, j) => ((a.t||[])[j]||[]).length > 0);
       if(p.tipo === 'versione') ok = (p.frasi||[]).every((f, j) => String(((a.f||[])[j]||{}).tr||'').trim());
       if(p.tipo === 'riscrivi') ok = (p.voci||[]).every((v, j) => String((a.r||[])[j]||'').trim());
       if(!ok) out.push(i + 1);
@@ -342,7 +420,7 @@
     return out;
   }
 
-  const TIPI_PROVA = {riscrivi: 'Riscrittura', analisi: 'Analisi libera', errori: 'Caccia all\'errore', motiva: 'Chi ha ragione?', scrivi: 'Scrittura con vincoli', versione: 'Versione a tappe'};
+  const TIPI_PROVA = {riscrivi: 'Riscrittura', analisi: 'Analisi libera', errori: 'Caccia all\'errore', motiva: 'Chi ha ragione?', scrivi: 'Scrittura con vincoli', versione: 'Versione a tappe', mossa: 'Una mossa sola', frase: 'Tutto in una frase', tessere: 'Tessere'};
   const statoHtml = c => !c ? '<span class="badge">da affrontare</span>'
     : c.stato === 'bozza' ? '<span class="badge warn">bozza salvata</span>'
     : '<span class="badge ok">consegnata</span>';

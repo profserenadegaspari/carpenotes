@@ -588,3 +588,9 @@ span.pick{cursor:default}
 .med.off .na1,.med.off .na2{fill:var(--line)}.med.off .m1{fill:var(--edge)}.med.off .m2{fill:var(--surface-2)}.med.off .m3{stroke:var(--surface);stroke-dasharray:4 4}.med.off text{fill:var(--edge)}
 .trags .med svg{width:70px;height:84px}
 @media(max-width:600px){.meds{grid-template-columns:repeat(2,1fr);row-gap:20px}.med-track .line{display:none}}
+/* Sfide brevi: una mossa sola e tessere */
+.mossa{margin:14px 0 0;padding-top:12px;border-top:2px dashed var(--line)}
+.mossa:first-of-type{border-top:0;padding-top:0}
+.mossa .frase{align-items:center}
+.mossa-in input{width:100%;box-sizing:border-box;margin-top:4px}
+.tess-riga{min-height:46px;border:2px dashed var(--edge);border-radius:12px;padding:8px;margin:8px 0}

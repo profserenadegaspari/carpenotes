@@ -14,3 +14,7 @@ Senza collegare GitHub: premi **Scarica per il sito online (cifrato)**, poi qui 
 scegli **Add file › Upload files**, trascina `contenuti-cifrati.js` e premi **Commit changes**.
 
 L'area docente e il file `contenuti.js` normale non vanno mai caricati qui.
+
+## Font
+I caratteri (Bricolage Grotesque e Nunito) sono in `assets/fonts/`, ospitati qui: il sito non li chiede a Google Fonts,
+quindi aprendo le pagine nessun dato degli studenti arriva a server esterni. Licenza SIL Open Font License 1.1 (file `OFL-*.txt`).

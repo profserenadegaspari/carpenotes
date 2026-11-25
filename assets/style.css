@@ -758,3 +758,55 @@ span.pick{cursor:default}
 .med.off .na1,.med.off .na2{fill:var(--line)}.med.off .m1{fill:var(--edge)}.med.off .m2{fill:var(--surface-2)}.med.off .m3{stroke:var(--surface);stroke-dasharray:4 4}.med.off text{fill:var(--edge)}
 .trags .med svg{width:70px;height:84px}
 @media(max-width:600px){.meds{grid-template-columns:repeat(2,1fr);row-gap:20px}.med-track .line{display:none}}
+/* Sfide brevi: una mossa sola e tessere */
+.mossa{margin:14px 0 0;padding-top:12px;border-top:2px dashed var(--line)}
+.mossa:first-of-type{border-top:0;padding-top:0}
+.mossa .frase{align-items:center}
+.mossa-in input{width:100%;box-sizing:border-box;margin-top:4px}
+.tess-riga{min-height:46px;border:2px dashed var(--edge);border-radius:12px;padding:8px;margin:8px 0}
+
+/* ---------- Storia: linea del tempo e carta storica ---------- */
+.linea{list-style:none;margin:6px 0 0;padding:0 0 0 22px;position:relative}
+.linea::before{content:"";position:absolute;left:8px;top:10px;bottom:10px;width:3px;border-radius:2px;background:var(--sto)}
+.linea li{position:relative;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0}
+.linea li::before{content:"";position:absolute;left:-19px;top:50%;width:11px;height:11px;margin-top:-6px;border-radius:50%;background:var(--surface);border:3px solid var(--sto)}
+.linea .ld{min-width:92px;font-weight:800;font-size:.88rem;color:var(--sto);font-variant-numeric:tabular-nums}
+.linea .lp{flex:1;min-width:180px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.linea .lfix{font-weight:700;padding:6px 10px;border-radius:10px;background:var(--surface-2);border:2px solid var(--line)}
+.linea .slot,.clist .slot{appearance:none;font:inherit;font-weight:700;text-align:left;width:100%;min-height:40px;padding:6px 10px;border:2px dashed var(--edge);border-radius:10px;background:var(--surface);color:var(--muted);cursor:pointer}
+.linea .slot.full,.clist .slot.full{border-style:solid;color:var(--ink);background:var(--brand-soft)}
+.linea .slot.on,.clist .slot.on{border-color:var(--brand);border-style:solid;box-shadow:0 0 0 3px var(--brand-soft)}
+.linea .slot.right,.clist .slot.right{border:2px solid var(--ok);background:var(--ok-soft);color:var(--ok);cursor:default}
+.linea .slot.wrong,.clist .slot.wrong{border:2px solid var(--ko);background:var(--ko-soft);color:var(--ko);text-decoration:line-through;cursor:default}
+.linea .corr,.clist .corr{font-weight:800;color:var(--ok);font-size:.92rem}
+.carta{border:2px solid var(--edge);border-radius:14px;overflow:hidden;box-shadow:0 3px 0 var(--shadow-c);margin:4px 0 12px;background:var(--surface)}
+.carta svg{display:block;width:100%;height:auto;max-height:70vh}
+.carta .acqua{fill:#dcecfb}
+.carta .terra{fill:#f6efdc;stroke:#b9a988;stroke-width:1;stroke-linejoin:round}
+.carta .fiume{fill:none;stroke:#3a8fd8;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.carta text{font-family:var(--font);font-weight:800;pointer-events:none}
+.carta text.mare{font-size:13px;font-style:italic;fill:#4f7fae;letter-spacing:.5px}
+.carta text.regione{font-size:12px;fill:#8a7a55;letter-spacing:1px;text-transform:uppercase}
+.carta text.nome{font-size:13px;fill:var(--ink);paint-order:stroke;stroke:#fff;stroke-width:4px}
+.carta .pt{cursor:pointer}
+.carta .pt circle{fill:var(--sto);stroke:#fff;stroke-width:2.5}
+.carta .pt text{font-size:12px;fill:#fff;text-anchor:middle}
+.carta .pt.on circle{fill:var(--brand);r:14}
+.carta .pt.ok circle{fill:var(--ok)}
+.carta .pt.ko circle{fill:var(--ko)}
+.clist{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.clist li{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.clist .cn{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--sto);color:#fff;font-weight:800;font-size:.85rem}
+.clist .slot{flex:1;width:auto}
+.teoria .carta{max-width:560px}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .carta .acqua{fill:#1b2d48} :root:not([data-theme="light"]) .carta .terra{fill:#3a3552;stroke:#6d6690} :root:not([data-theme="light"]) .carta text.nome{fill:#f2f0ff;stroke:#131129} :root:not([data-theme="light"]) .carta text.mare{fill:#8fb4dc} :root:not([data-theme="light"]) .carta .pt text{fill:#131129} }
+:root[data-theme="dark"] .carta .acqua{fill:#1b2d48} :root[data-theme="dark"] .carta .terra{fill:#3a3552;stroke:#6d6690} :root[data-theme="dark"] .carta text.nome{fill:#f2f0ff;stroke:#131129} :root[data-theme="dark"] .carta text.mare{fill:#8fb4dc} :root[data-theme="dark"] .carta .pt text{fill:#131129}
+.carta .dot{fill:var(--sto);stroke:#fff;stroke-width:2}
+.carta figcaption{font-size:.82rem;font-weight:700;color:var(--muted);padding:6px 12px;border-top:2px solid var(--line)}
+figure.carta{margin:12px 0}
+.att-tipo.t-linea{background:var(--ok-soft);color:var(--sto)} .att-tipo.t-carta{background:#dcecfb;color:#2f6aa3}
+.bank.consuma{position:static}
+.bank.consuma .chip-v.used{display:none}
+.bank.consuma .chip-v{font-size:.9rem}
+.linea .ld{min-width:78px}
+@media (max-width:560px){ .linea .lp{min-width:0} .linea li{flex-wrap:nowrap} }

@@ -24,6 +24,7 @@
     const c = loc && loc.materie ? loc : fileCatalog();
     if(c === loc){ // catalogo salvato dalla docente prima delle attività lunghe: le prende dal file
       const f = fileCatalog(), att = {};
+      if(f.sfide) c.sfide = f.sfide; // le sfide si scrivono solo nel file contenuti.js: valgono sempre quelle del file
       (f.materie||[]).forEach(m => (m.sezioni||[]).forEach(s => (s.argomenti||[]).forEach(a => { if(a.attivita) att[a.id] = a.attivita; })));
       c.materie.forEach(m => (m.sezioni||[]).forEach(s => (s.argomenti||[]).forEach(a => { if(!a.attivita && att[a.id]) a.attivita = att[a.id]; })));
       // sezioni arrivate con un contenuti.js più recente (es. Latino): si aggiungono senza toccare le modifiche della docente

@@ -209,7 +209,7 @@
     fuoriQuiz();
     app.innerHTML = `<div class="crumbs"><a href="#/">Materie</a> › <a href="#/m/${m.id}">${esc(m.nome)}</a> › <span>${esc(sez.titolo)}</span></div>
       <div class="btn-row arg-head" style="justify-content:space-between;margin-bottom:12px"><h1 style="margin:0">${esc(a.titolo)}</h1>${CN.stelleHtml(CN.stelle(best(P, a.id), P.soglia))}</div>
-      <div class="tabs"><button data-t="teoria">Teoria</button><button data-t="esercizi">Esercizi (${(a.attivita||[]).length + ((a.esercizi||[]).length ? 1 : 0)})</button><button data-t="storico">I miei tentativi</button></div>
+      <div class="tabs">${a.teoria ? '<button data-t="teoria">Teoria</button>' : ''}<button data-t="esercizi">Esercizi (${(a.attivita||[]).length + ((a.esercizi||[]).length ? 1 : 0)})</button><button data-t="storico">I miei tentativi</button></div>
       <div id="pane"></div>`;
     const pane = app.querySelector('#pane');
     const tb = app.querySelectorAll('.tabs button');
@@ -232,7 +232,7 @@
       if(CN.guardia && CN.guardia()){ if(!await CN.conferma(CN.guardia(), 'Esci')) return; }
       fuoriQuiz(); show(b.dataset.t);
     });
-    show(tab || 'teoria');
+    show(tab || (a.teoria ? 'teoria' : 'esercizi')); // senza teoria (es. Storia) si apre direttamente sugli esercizi
   }
 
   /* ---------- Menu delle attività di un argomento ---------- */
@@ -244,8 +244,8 @@
     const lente = CN.sfide.lente(cat, a.id);
     if(!att.length && !quiz.length && !lente){ pane.innerHTML = '<p class="muted">Non ci sono ancora esercizi qui.</p>'; return; }
     const torna = () => viewArgomento(s, prof(s), m.id, sez.id, a.id, 'esercizi');
-    const teoria = () => viewArgomento(s, prof(s), m.id, sez.id, a.id, 'teoria');
-    if(!att.length && !lente){ startQuiz(pane, s, {lista: quiz, m, sez, a, modo: 'argomento', esci: teoria, teoria}); return; }
+    const teoria = a.teoria ? () => viewArgomento(s, prof(s), m.id, sez.id, a.id, 'teoria') : null;
+    if(!att.length && !lente){ startQuiz(pane, s, {lista: quiz, m, sez, a, modo: 'argomento', esci: teoria || (() => R.go('/m/' + m.id)), teoria}); return; }
     pane.innerHTML = `<p class="muted" style="margin-top:0">Scegli da dove partire. Ogni attività è un esercizio completo: per superare l'argomento basta arrivare al ${P.soglia}% in una di queste.</p><div class="att-grid"></div>`;
     const grid = pane.querySelector('.att-grid');
     const carta = (id, tipo, titolo, info, livello, fn) => {
@@ -328,8 +328,8 @@
       const sbloccate = CN.sfide.elenco(cat).filter(x => !x.sf.lente && CN.sfide.sblocco(cat, P, x.sf).ok && !CN.sfide.sblocco(cat, prima, x.sf).ok);
       const msg = perc === 100 ? 'Perfetto!' : perc >= 90 ? 'Quasi perfetto!' : ok ? (ripasso ? 'Bel ripasso!' : 'Argomento superato!')
         : perc >= P.soglia - 15 ? `Ci sei quasi: ti mancano pochi punti per il ${P.soglia}%.`
-        : perc >= 30 ? (ripasso ? 'Questi sono ancora difficili: ripassali con calma.' : 'Non ancora: rileggi la teoria e riprova.')
-        : (ripasso ? 'Ripasso in salita: rileggi le spiegazioni e riprova.' : 'Partenza in salita: riparti dalla teoria, poi riprova.');
+        : perc >= 30 ? (ripasso ? 'Questi sono ancora difficili: ripassali con calma.' : (cfg.teoria ? 'Non ancora: rileggi la teoria e riprova.' : 'Non ancora: guarda bene le correzioni e riprova.'))
+        : (ripasso ? 'Ripasso in salita: rileggi le spiegazioni e riprova.' : (cfg.teoria ? 'Partenza in salita: riparti dalla teoria, poi riprova.' : 'Partenza in salita: riguarda il libro e le correzioni, poi riprova.'));
       const debole = !ok && perc < P.soglia - 15;
       pane.innerHTML = `<div class="card" style="text-align:center">
         ${cfg.modo === 'argomento' ? CN.stelleHtml(CN.stelle(perc, P.soglia), true) : ''}
@@ -350,7 +350,7 @@
         if(errori.length && !cfg.att) add(`<button class="btn accent">Ripassa gli errori (${errori.length})</button>`, () => startQuiz(pane, s, Object.assign({}, cfg, {lista: lista.filter(e => errori.includes(e.id)), modo: 'errori'})));
         add(`<button class="btn">${cfg.att ? 'Riprova' : 'Ricomincia'}</button>`, () => { startQuiz(pane, s, Object.assign({}, cfg, {lista: cfg.att ? [cfg.att] : cfg.a.esercizi, modo: 'argomento'})); window.scrollTo(0, 0); });
         add(`<button class="btn ${nx && superato(P, cfg.a.id) || debole ? '' : 'primary'}">Altre attività</button>`, cfg.esci);
-        add(`<button class="btn ${debole ? 'primary' : 'ghost'}">Rivedi la teoria</button>`, cfg.teoria || cfg.esci);
+        if(cfg.teoria) add(`<button class="btn ${debole ? 'primary' : 'ghost'}">Rivedi la teoria</button>`, cfg.teoria);
       } else {
         add(`<a class="btn primary" href="#/ripasso">Torna al ripasso</a>`, e => { e.preventDefault(); e.stopPropagation(); R.refresh(); });
         add(`<a class="btn ghost" href="#/progressi">Vedi i progressi</a>`);

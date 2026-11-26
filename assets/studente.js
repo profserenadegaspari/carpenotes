@@ -119,10 +119,13 @@
   }
 
   /* ---------- Home ---------- */
+  // Nome e cognome come li ha scritti la prof; se è tutto in maiuscolo diventa «Voltolina Clara».
+  const nomeSaluto = n => { const t = String(n || '').trim().replace(/\s+/g, ' ');
+    return t === t.toLocaleUpperCase('it-IT') ? CN.maiuscole(t.toLocaleLowerCase('it-IT')) : t; };
   function viewHome(s, P){
     const oggiFatto = P.giorni.has(CN.giorno(new Date()));
     const frase = !P.rs.length ? 'Scegli una materia e comincia il primo allenamento.' : oggiFatto ? 'Oggi ti sei già allenato. Vuoi fare un altro giro?' : 'Oggi non ti sei ancora allenato: bastano cinque minuti.';
-    app.innerHTML = `<section class="hero"><h1>Ciao <span class="hl">${esc(s.nome.split(' ')[0])}</span>!</h1><p class="muted">${frase}</p></section>
+    app.innerHTML = `<section class="hero"><h1>Ciao <span class="hl">${esc(nomeSaluto(s.nome))}</span>!</h1><p class="muted">${frase}</p></section>
       <div id="next" style="margin-bottom:16px"></div>
       <div class="grid cols-2">${cartaLivello(P)}${cartaSettimana(P)}</div>
       <div id="boss" style="margin-top:16px"></div>

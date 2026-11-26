@@ -37,7 +37,8 @@
     nonattivi: 'La prof non ha ancora attivato gli inviti. Riprova più tardi.',
     browser: 'Questo browser è troppo vecchio per controllare il link. Prova con un altro browser aggiornato.',
     diverso: 'Per continuare ti serve il tuo link personale della prof.',
-    manca: 'Per entrare ti serve il link che ti ha mandato la prof.'
+    manca: 'Per entrare ti serve il link che ti ha mandato la prof.',
+    tagliato: 'Il link si è aperto solo a metà: nell\'email era spezzato su più righe e solo la prima parte era cliccabile. Copia tutto il link, comprese le righe sotto, e incollalo qui.'
   };
   function viewLogin(){
     app.innerHTML = `
@@ -73,6 +74,7 @@
   // Apertura del link d'invito
   async function viewInvito(codice){
     app.innerHTML = '<p class="muted">Controllo il tuo invito…</p>';
+    if(CN.inviti.tagliato(codice)){ avviso = MOTIVI.tagliato; header(null); return viewLogin(); }
     const r = await CN.inviti.verifica(codice);
     if(!r.ok){ avviso = MOTIVI[r.motivo] || MOTIVI.falso; header(null); return viewLogin(); }
     const d = r.dati, att = CN.studente();

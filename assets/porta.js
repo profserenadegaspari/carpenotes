@@ -13,7 +13,7 @@
   const togli = () => { try{ localStorage.removeItem(K); }catch(e){} };
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c]);
   // dal link: …#/invito/<dati>.<firma>.<chiave>
-  const parti = t => { const m = String(t || '').match(/invito[\/=]([A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+)\.([A-Za-z0-9_\-]{43})/); return m ? {codice: m[1] + '.' + m[2], chiave: m[2]} : null; };
+  const parti = t => { const m = String(t || '').replace(/\s+/g, '').match(/invito[\/=]([A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+)\.([A-Za-z0-9_\-]{43})/); return m ? {codice: m[1] + '.' + m[2], chiave: m[2]} : null; };
 
   function schermata(avviso, conModulo){
     app.innerHTML = `
@@ -55,7 +55,8 @@
     if(!(window.crypto && crypto.subtle)) return schermata('Questo browser è troppo vecchio per aprire Carpe Notes. Prova con un altro browser aggiornato.', false);
     const dalLink = parti(location.hash);
     const k = dalLink ? dalLink.chiave : leggi();
-    if(!k) return schermata('');
+    // link aperto solo a metà (l'email ha spezzato il link e reso cliccabile solo la prima riga)
+    if(!k) return schermata(/invito[\/=]/.test(location.hash) ? 'Il link si è aperto solo a metà: nell\'email era spezzato su più righe e solo la prima parte era cliccabile. Copia tutto il link, comprese le righe sotto, e incollalo qui.' : '');
     app.innerHTML = '<p class="muted">Caricamento…</p>';
     let cat;
     try{ cat = await apri(k); }

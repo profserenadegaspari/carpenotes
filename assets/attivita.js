@@ -12,6 +12,7 @@
      versione   {testo, categorie, frasi: [{la: "[Caesar|s] [vicit|v]", lex?, domanda?: [q, [giusta, ...]], trad: [giusta, sbagliata, ...]}]}
                 versione guidata: per ogni frase si evidenziano verbo, soggetto… e si sceglie la traduzione; alla fine si legge la traduzione completa
      linea      {testo, eventi: [[data, evento, fisso?], ...] in ordine cronologico, date?: true, extra?: [...]}   linea del tempo: metti gli eventi in ordine (o accanto alle date)
+     riordina   {testo, voci: [testo | [testo, true = fisso], ...] nell'ordine giusto, hint?}   metti in ordine sequenze, passaggi, paragrafi
      carta      {testo, mappa: 'egitto'|'egeo'|'mediterraneo', punti: [[lon, lat, nome], ...], scritte?: [[lon, lat, testo, classe?]], extra?: [...]}
                 carta storica: tocca il numero e scegli il nome del luogo
 */
@@ -53,13 +54,14 @@
       case 'analisi': return (es.frasi||[]).reduce((n, f) => n + parseFrase(f).filter(p => p.e).length, 0);
       case 'quiz': return (es.domande||[]).length;
       case 'linea': return (es.eventi||[]).filter(e => !e[2]).length;
+      case 'riordina': return (es.voci||[]).filter(v => !(Array.isArray(v) && v[1])).length;
       case 'carta': return (es.punti||[]).length;
       case 'versione': return (es.frasi||[]).reduce((n, f) => n + parseMarcato(f.la).filter(t => t.k).length + 1 + (f.domanda ? 1 : 0), 0);
       default: return 1;
     }
   }
   const UNITA = {evidenzia: 'parole da trovare', classifica: 'voci da classificare', correggi: 'errori da trovare', trasforma: 'frasi da trasformare',
-    cloze: 'spazi da completare', analisi: 'elementi da analizzare', vfm: 'affermazioni', quiz: 'domande', versione: 'passaggi', linea: 'eventi da ordinare', carta: 'luoghi da trovare'};
+    cloze: 'spazi da completare', analisi: 'elementi da analizzare', vfm: 'affermazioni', quiz: 'domande', versione: 'passaggi', linea: 'eventi da ordinare', riordina: 'pezzi da mettere in ordine', carta: 'luoghi da trovare'};
 
   const R = {};
 
@@ -409,7 +411,7 @@
   R.linea = (es, box, opts) => {
     box.insertAdjacentHTML('beforeend', `<div class="ex-q">${es.testo}</div>`);
     const ev = (es.eventi||[]).map(([d, t, f]) => ({d, t, f: !!f}));
-    const ol = CN.h(`<ol class="linea${es.date ? ' con-date' : ''}"></ol>`); const slots = [];
+    const ol = CN.h(`<ol class="linea${es.date ? ' con-date' : ''}${es.ordine ? ' ordine' : ''}"></ol>`); const slots = [];
     ev.forEach((e, i) => {
       const li = CN.h(`<li${e.f ? ' class="fisso"' : ''}><span class="ld">${es.date || e.f ? esc(e.d) : '?'}</span><span class="lp"></span></li>`);
       if(e.f) li.querySelector('.lp').innerHTML = `<span class="lfix">${esc(e.t)}</span>`;
@@ -418,7 +420,7 @@
     });
     const B = banca(box, opts, slots, ev.filter(e => !e.f).map(e => e.t).concat(es.extra || []));
     box.appendChild(B.bank); box.appendChild(ol);
-    box.insertAdjacentHTML('beforeend', `<div class="hint">${es.date ? 'Metti ogni evento accanto alla sua data.' : 'Metti gli eventi in ordine, dal più antico (in alto) al più recente.'} Tocca una casella e poi l'evento; tocca una casella piena per svuotarla.</div>`);
+    box.insertAdjacentHTML('beforeend', `<div class="hint">${es.hint ? es.hint : es.date ? 'Metti ogni evento accanto alla sua data.' : 'Metti gli eventi in ordine, dal più antico (in alto) al più recente.'} Tocca una casella e poi l'evento; tocca una casella piena per svuotarla.</div>`);
     return () => {
       if(slots.some(sl => !sl.val)) return null;
       let ok = 0; B.fine();
@@ -430,6 +432,12 @@
       return {punti: slots.length ? ok / slots.length : 0, n: slots.length, ok};
     };
   };
+
+  /* ---------- Metti in ordine (scrittura: sequenze, passaggi, paragrafi) ---------- */
+  // voci nell'ordine giusto; [testo, true] = pezzo già al suo posto
+  R.riordina = (es, box, opts) => R.linea(Object.assign({}, es, {date: true, ordine: true,
+    eventi: (es.voci||[]).map((v, i) => Array.isArray(v) ? [(i + 1) + '.', v[0], !!v[1]] : [(i + 1) + '.', v]),
+    hint: es.hint || 'Metti i pezzi nell\'ordine giusto, dal primo (in alto) all\'ultimo.'}), box, opts);
 
   /* ---------- Carta storica ---------- */
   // mappa: id in CN.MAPPE; punti: [[lon, lat, nome], ...]; scritte: [[lon, lat, testo], ...] (solo orientamento); extra: nomi trappola
@@ -475,7 +483,7 @@
   CN.svgCarta = (id, scritte) => MAPPE[id] ? svgCarta(MAPPE[id], scritte) : '';
 
   Object.assign(CN.TIPI, {evidenzia: 'Evidenzia nel testo', classifica: 'Classifica', correggi: 'Trova e correggi', trasforma: 'Trasforma le frasi',
-    cloze: 'Completa il testo', analisi: 'Analizza le frasi', vfm: 'Vero o falso, e perché', quiz: 'Domande sul testo', versione: 'Versione guidata', linea: 'Linea del tempo', carta: 'Carta storica'});
+    cloze: 'Completa il testo', analisi: 'Analizza le frasi', vfm: 'Vero o falso, e perché', quiz: 'Domande sul testo', versione: 'Versione guidata', linea: 'Linea del tempo', riordina: 'Metti in ordine', carta: 'Carta storica'});
   CN.TIPI_EXTRA = R;
   CN.attivita = {conta, UNITA, parseMarcato, parseErrori, parseCloze, parseFrase};
 })();

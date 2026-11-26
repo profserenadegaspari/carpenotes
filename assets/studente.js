@@ -382,16 +382,17 @@
     const righe = [...P.args.entries()].filter(([id]) => P.idx.arg.has(id)).map(([id, a]) => Object.assign({id, x: P.idx.arg.get(id)}, a));
     const rinfresca = righe.filter(r => CN.stelle(r.best, P.soglia) >= 2 && giorniFa(r.data) >= 7).sort((a,b) => (a.data||'').localeCompare(b.data||'')).slice(0, 5);
     const deboli = righe.filter(r => CN.stelle(r.best, P.soglia) < 2).sort((a,b) => a.best - b.best).slice(0, 5);
-    const nErr = P.erroriAperti.length;
+    const D = CN.daRipassare(P, 12);
     const pool = righe.flatMap(r => r.x.a.esercizi || []);
     const debole = deboli[0];
     const link = r => `#/a/${r.x.m.id}/${r.x.s.id}/${r.id}`;
     const riga = (r, meta) => `<a class="arg ${r.best >= P.soglia ? 'done' : 'progress'}" href="${link(r)}" style="text-decoration:none;color:inherit"><div class="n">${r.best}</div><div class="body"><div class="title">${esc(r.x.a.titolo)}</div><div class="meta">${esc(r.x.s.titolo)} · ${meta}</div></div>${CN.stelleHtml(CN.stelle(r.best, P.soglia))}</a>`;
     app.innerHTML = `<section class="hero"><h1><span class="hl">Ripasso</span></h1><p class="muted">Poco e spesso funziona meglio di tanto e una volta sola. Scegli come ripassare oggi.</p></section>
       <div id="pane"><div class="grid cols-3">
-        <div class="card mode"><div class="tagc" style="background:var(--pink)">${nErr}</div><h3>I miei errori</h3>
-          <p class="muted small">Rifai gli esercizi sbagliati l'ultima volta. Quando li azzecchi, escono dalla lista.</p>
-          <button class="btn accent" id="err" ${nErr ? '' : 'disabled'}>${nErr ? `Ripassa ${Math.min(10, nErr)} ${Math.min(10, nErr) === 1 ? 'errore' : 'errori'}` : 'Nessun errore in sospeso'}</button></div>
+        <div class="card mode"><div class="tagc" style="background:var(--pink)">${D.lista.length}</div><h3>I miei errori</h3>
+          <p class="muted small">${D.lista.length ? `Una sessione breve con gli esercizi che hai sbagliato e quelli che non rivedi da più di due settimane. Quando li azzecchi, escono dalla lista.` : !P.rs.length ? 'Qui ritroverai gli esercizi sbagliati e quelli da rivedere: prima fai qualche allenamento.' : 'Niente da ripassare: nessun errore in sospeso e hai rivisto tutto di recente. Torna fra qualche giorno, o prova il mix veloce.'}</p>
+          ${D.lista.length ? `<p class="small" style="margin:-4px 0 10px;font-weight:700">${[D.conta.errore ? `${D.conta.errore} ${D.conta.errore === 1 ? 'errore' : 'errori'}` : '', D.conta.debole ? `${D.conta.debole} da argomenti non ancora superati` : '', D.conta.vecchio ? `${D.conta.vecchio} da rinfrescare` : ''].filter(Boolean).join(' · ')}</p>` : ''}
+          <button class="btn accent" id="err" ${D.lista.length ? '' : 'disabled'}>${D.lista.length ? 'Ripassa i miei errori' : 'Nessun errore in sospeso'}</button></div>
         <div class="card mode"><div class="tagc" style="background:var(--yellow)">10</div><h3>Mix veloce</h3>
           <p class="muted small">Dieci esercizi a sorpresa, pescati dagli argomenti che hai già fatto.</p>
           <button class="btn sun" id="mix" ${pool.length ? '' : 'disabled'}>${pool.length ? 'Inizia il mix' : 'Completa prima un argomento'}</button></div>
@@ -406,7 +407,7 @@
       </div>`;
     const pane = app.querySelector('#pane');
     const via = (lista, modo) => { pane.innerHTML = ''; startQuiz(pane, s, {lista, modo, esci: () => R.refresh()}); window.scrollTo(0, 0); };
-    app.querySelector('#err').onclick = () => via(P.erroriAperti.slice(0, 10).map(id => P.idx.es.get(id).e), 'ripasso-errori');
+    app.querySelector('#err').onclick = () => via(D.lista, 'ripasso-errori');
     app.querySelector('#mix').onclick = () => via(CN.shuffle(pool).slice(0, 10), 'ripasso-misto');
   }
 
@@ -515,7 +516,7 @@
     const si = altri.filter(b => b.ok), no = altri.filter(b => !b.ok).sort((a,b) => b.cur/b.tot - a.cur/a.tot);
     app.innerHTML = `<section class="hero"><h1><span class="hl">Traguardi</span></h1><p class="muted">Ogni allenamento vale punti esperienza. Con i punti sali di livello, con la costanza conquisti gli adesivi.</p></section>
       <div class="grid cols-2">${cartaLivello(P)}
-        <div class="card"><h3>Come si guadagnano i punti</h3><ul class="small" style="margin:6px 0 0;padding-left:18px"><li>10 XP per ogni esercizio giusto</li><li>20 XP in più la prima volta che fai 100% in un'attività</li><li>Rifare un'attività vale punti pieni solo se batti il tuo record; altrimenti un quarto</li><li>Nel ripasso: 10 XP per esercizio giusto, 2 se l'hai già azzeccato oggi</li></ul>
+        <div class="card"><h3>Come si guadagnano i punti</h3><ul class="small" style="margin:6px 0 0;padding-left:18px"><li>10 XP per ogni esercizio giusto</li><li>20 XP in più la prima volta che fai 100% in un'attività</li><li>Rifare un'attività vale punti pieni solo se batti il tuo record; altrimenti un quarto</li><li>Nel ripasso: 5 XP per esercizio giusto, 10 se correggi un tuo errore; 1 se l'hai già azzeccato oggi</li><li>Il ripasso dà al massimo 100 XP al giorno: poi ogni esercizio giusto vale 1 XP</li></ul>
         <div class="small muted" style="margin-top:8px">Livelli: ${CN.LIVELLI.map((l, i) => i + 1 === P.livello.n ? `<b>${l[1]}</b>` : l[1]).join(' → ')}</div></div></div>
       <div class="sec-title"><h2>Medaglie delle sfide</h2><span class="small muted">${P.sfide.consegnate} ${P.sfide.consegnate === 1 ? 'sfida consegnata' : 'sfide consegnate'}</span></div>${CN.medaglieSfide(P)}
       <div class="sec-title"><h2>Ottenuti</h2><span class="badge ok">${si.length} di ${altri.length}</span></div>

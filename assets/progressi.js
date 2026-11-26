@@ -33,28 +33,41 @@
   }
 
   /* ---------- Punti, livelli, stelle ---------- */
+  /* Dodici livelli (dal 25 novembre 2026). Un argomento fatto con cura (quiz lampo e due attività) vale circa 300-400 XP:
+     chi lavora con regolarità arriva a Philosophus verso il 30° argomento e a Princeps verso il 70°, cioè alla fine del biennio. */
   const LIVELLI = [
-    [0,'Tiro','recluta'], [100,'Discipulus','allievo'], [250,'Scriba','scrivano'], [500,'Lector','lettore'], [900,'Grammaticus','grammatico'],
-    [1400,'Rhetor','retore'], [2000,'Orator','oratore'], [3000,'Magister','maestro'], [4500,'Philosophus','filosofo']
+    [0,'Tiro','recluta'], [150,'Discipulus','allievo'], [500,'Scriba','scrivano'], [1100,'Lector','lettore'], [2000,'Grammaticus','grammatico'],
+    [3300,'Rhetor','retore'], [5000,'Orator','oratore'], [7500,'Magister','maestro'], [11000,'Philosophus','filosofo'],
+    [16000,'Sapiens','sapiente'], [22500,'Auctor','autore'], [30000,'Princeps','il primo tra i dotti']
   ];
   /* Punti esperienza. Un allenamento vale XP pieni solo per ciò che migliora il proprio record su quella attività
      (più 20 XP la prima volta che si fa 100%); rifarlo senza migliorare vale un quarto dei punti.
-     Nel ripasso ogni esercizio giusto vale 10 XP la prima volta nella giornata, poi 2. */
-  const XP_RIP = .25, xpMemo = new WeakMap();
+     Ripasso (dal 25 novembre 2026): ogni esercizio giusto vale 5 XP, 10 se corregge un errore in sospeso
+     (sbagliato l'ultima volta); 1 XP se è già stato azzeccato nella giornata. Al giorno il ripasso dà al massimo
+     100 XP pieni: oltre, ogni esercizio giusto vale 1 XP. Così il ripasso conta, ma non si sale di livello ripetendolo all'infinito. */
+  const XP_RIP = .25, xpMemo = new WeakMap(), REGOLE = {rip: 5, corretto: 10, poi: 1, tetto: 100};
   const xpBase = r => Math.round((r.punteggio/100) * (r.totale||0) * 10);
   function annotaXp(rs){
     const perStud = new Map();
     rs.slice().sort((a,b) => (a.data||'').localeCompare(b.data||'')).forEach(r => {
       const sk = (r.nome||'') + '|' + (r.classe||'');
-      const st = perStud.get(sk) || {best: new Map(), rip: new Map()}; perStud.set(sk, st);
+      const st = perStud.get(sk) || {best: new Map(), rip: new Map(), pieni: new Map(), ultimo: new Map()}; perStud.set(sk, st);
       const tot = r.totale || 0;
+      const es = r.esiti || [];
       if(r.ripasso){
         const g = giorno(r.data), fatti = st.rip.get(g) || new Set(); st.rip.set(g, fatti);
-        const es = r.esiti || [];
-        if(!es.length){ xpMemo.set(r, xpBase(r)); return; }
-        let x = 0; es.forEach(e => { if(e.p <= 0) return; if(fatti.has(e.id)) x += 2 * e.p; else { x += 10 * e.p; if(e.p >= .999) fatti.add(e.id); } });
-        xpMemo.set(r, Math.round(x)); return;
+        if(!es.length){ xpMemo.set(r, Math.round((r.punteggio/100) * tot * REGOLE.rip)); return; }
+        let x = 0, pieni = st.pieni.get(g) || 0;
+        es.forEach(e => {
+          const prima = st.ultimo.get(e.id); st.ultimo.set(e.id, e.p);
+          if(e.p <= 0) return;
+          if(fatti.has(e.id) || pieni >= REGOLE.tetto){ x += REGOLE.poi * e.p; return; }
+          const v = Math.min((prima != null && prima < .999 ? REGOLE.corretto : REGOLE.rip) * e.p, REGOLE.tetto - pieni);
+          x += v; pieni += v; if(e.p >= .999) fatti.add(e.id);
+        });
+        st.pieni.set(g, pieni); xpMemo.set(r, Math.round(x)); return;
       }
+      es.forEach(e => st.ultimo.set(e.id, e.p));
       const k = (r.argomento||'') + '|' + (r.attivita||'quiz');
       const prev = st.best.has(k) ? st.best.get(k) : null, p = r.punteggio;
       let x;
@@ -139,6 +152,44 @@
     });
     return {rs, idx, soglia, xp, livello: livello(xp), streak, record, giorni, args, nEs, nRip, tempo,
       sfide: S, precisione: nEs ? Math.round(pesata / nEs) : null, superati, perfetti, provati: validi.length, totArg: idx.arg.size, erroriAperti, tipi, badge};
+  }
+
+  /* ---------- «Ripassa i miei errori»: una sessione breve dagli esercizi sbagliati o non visti da tempo ----------
+     Ordine di priorità: 1) esercizi del quiz sbagliati l'ultima volta (i più vecchi prima);
+     2) esercizi degli argomenti provati ma non ancora superati (anche se l'errore era in un'attività lunga);
+     3) esercizi di argomenti superati che non rivedi da almeno VECCHIO giorni. Al massimo `max` esercizi,
+     con almeno un terzo di posti per i gruppi 2 e 3 quando ci sono, e non più di 4 dallo stesso argomento. */
+  const VECCHIO = 14;
+  function daRipassare(P, max){
+    max = max || 12;
+    const ora = Date.now(), giorni = d => (ora - new Date(d).getTime()) / 86400000;
+    const visto = new Map(); // id esercizio -> {p, data} dell'ultima volta
+    P.rs.forEach(r => (r.esiti || (r.errori||[]).map(id => ({id, p:0}))).forEach(e => visto.set(e.id, {p: e.p, data: r.data})));
+    const errori = [], deboli = [], vecchi = [];
+    [...visto.entries()].filter(([id, v]) => v.p < .999 && P.idx.es.has(id)).sort((a, b) => (a[1].data||'').localeCompare(b[1].data||''))
+      .forEach(([id]) => errori.push(P.idx.es.get(id)));
+    const giaErr = new Set(errori.map(x => x.e.id));
+    const argomenti = [...P.args.entries()].filter(([id]) => P.idx.arg.has(id)).sort((a, b) => (a[1].data||'').localeCompare(b[1].data||''));
+    argomenti.forEach(([id, a]) => {
+      const x = P.idx.arg.get(id);
+      (x.a.esercizi || []).forEach(e => {
+        if(giaErr.has(e.id)) return;
+        const v = visto.get(e.id), y = {m: x.m, s: x.s, a: x.a, e};
+        if(a.best < P.soglia){ if(!v || giorni(v.data) >= 2) deboli.push(y); }
+        else if(giorni(a.data) >= VECCHIO && (!v || giorni(v.data) >= VECCHIO)) vecchi.push(y);
+      });
+    });
+    const per = new Map(), scelti = [];
+    const prendi = (gruppo, quanti, lim) => { for(const y of gruppo){ if(quanti <= 0 || scelti.length >= max) break;
+      const n = per.get(y.a.id) || 0; if(n >= (lim || 4) || scelti.includes(y)) continue; per.set(y.a.id, n + 1); scelti.push(y); quanti--; } };
+    const altri = deboli.length + vecchi.length ? Math.ceil(max / 3) : 0;
+    prendi(errori, max - altri);
+    // dagli altri due gruppi: un po' per uno, gli argomenti più vecchi prima
+    const misti = []; for(let i = 0; i < Math.max(deboli.length, vecchi.length); i++){ if(deboli[i]) misti.push(deboli[i]); if(vecchi[i]) misti.push(vecchi[i]); }
+    prendi(misti, max); prendi(errori, max); prendi(misti, max, Infinity); prendi(errori, max, Infinity);
+    const tipo = y => giaErr.has(y.e.id) ? 'errore' : deboli.includes(y) ? 'debole' : 'vecchio';
+    return {lista: CN.shuffle(scelti).map(y => y.e), nErrori: errori.length, nDeboli: deboli.length, nVecchi: vecchi.length,
+      conta: {errore: scelti.filter(y => tipo(y) === 'errore').length, debole: scelti.filter(y => tipo(y) === 'debole').length, vecchio: scelti.filter(y => tipo(y) === 'vecchio').length}};
   }
 
   const MEDAGLIE = [[1, 'Primo caso', 'bronzo'], [3, 'Investigatore', 'argento'], [5, 'Detective', 'oro'], [10, 'Ispettore capo', 'lilla']];
@@ -297,5 +348,5 @@
     return { go, get cur(){ return cur; }, refresh: () => cb(cur) };
   }
 
-  Object.assign(CN, {ico, stelleHtml, giorno, piu, lunedi, indice, LIVELLI, xpDi, annotaXp, livello, stelle, profilo, adesivo, medaglia, medaglieSfide, renderAnalitiche, durata, router});
+  Object.assign(CN, {ico, stelleHtml, giorno, piu, lunedi, indice, LIVELLI, XP_REGOLE: REGOLE, daRipassare, xpDi, annotaXp, livello, stelle, profilo, adesivo, medaglia, medaglieSfide, renderAnalitiche, durata, router});
 })();

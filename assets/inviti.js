@@ -18,12 +18,15 @@
 
   // Da un link incollato (o dal solo codice) ricava il codice d'invito
   function codiceDa(testo){
-    const t = String(testo || '').trim();
+    // toglie spazi e a capo: un link incollato da un'email o da un PDF può arrivare spezzato su più righe
+    const t = String(testo || '').replace(/\s+/g, '');
     const m = t.match(/invito[\/=]([A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)?)/);
     if(m) return m[1];
     return /^[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+(\.[A-Za-z0-9_\-]+)?$/.test(t) ? t : '';
   }
 
+  // Link spezzato: c'è l'inizio dell'invito ma manca il resto (es. l'email ha reso cliccabile solo la prima riga)
+  const tagliato = codice => !!codice && !/^[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]{40,}/.test(String(codice));
   // Controlla un codice. Risponde {ok:true, dati} oppure {ok:false, motivo}
   // motivi: manca, nonattivi, browser, falso, revocato
   async function verifica(codice){
@@ -102,5 +105,5 @@
   // Link completo: indirizzo + #/invito/<codice firmato>.<chiave del sito>
   const conChiave = (codice, st) => String(codice).split('.').slice(0, 2).join('.') + (st && st.chiaveSito ? '.' + st.chiaveSito : '');
 
-  CN.inviti = {disponibile, attivi, codiceDa, verifica, corrisponde, stato, salvaStato, nuovaChiave, firma, sincronizza, daPubblicare, nuovaChiaveSito, cifra, conChiave};
+  CN.inviti = {disponibile, attivi, codiceDa, tagliato, verifica, corrisponde, stato, salvaStato, nuovaChiave, firma, sincronizza, daPubblicare, nuovaChiaveSito, cifra, conChiave};
 })();

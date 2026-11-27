@@ -493,7 +493,8 @@
     return el;
   }
   function viewSfide(s, P){
-    const tutteSf = SF.elenco(cat), L = tutteSf.filter(x => !x.sf.lente && !x.sf.versione), LL = tutteSf.filter(x => x.sf.lente), VV = tutteSf.filter(x => x.sf.versione);
+    // Le prove «Sotto la lente» non sono più elencate qui: si aprono in fondo agli esercizi del loro argomento
+    const tutteSf = SF.elenco(cat), L = tutteSf.filter(x => !x.sf.lente && !x.sf.versione), VV = tutteSf.filter(x => x.sf.versione);
     const R1 = SF.riepilogo(SF.diStudente(s));
     app.innerHTML = `<section class="hero"><h1>Le sfide del <span class="hl">prof</span></h1>
       <p class="muted">Esercizi tosti, senza soluzione automatica: li corregge la tua insegnante e ti manda la correzione per email. Ogni sfida consegnata ti avvicina a una nuova medaglia.</p></section>
@@ -505,13 +506,12 @@
       <div class="sec-title"><h2>Le sfide</h2><span class="small muted" style="flex:1;margin-left:10px">${L.filter(x => SF.sblocco(cat, P, x.sf).ok).length} sbloccate su ${L.length}</span>${R1.consegnate ? `<span class="badge ok">${R1.consegnate} ${R1.consegnate === 1 ? 'consegnata' : 'consegnate'}</span>` : ''}</div>
       <div class="grid cols-2" id="L"></div>
       ${VV.length ? `<div class="sec-title" style="margin-top:26px"><h2>Versioni</h2><span class="small muted" style="flex:1;margin-left:10px">si traduce una frase alla volta, con l'aiuto che cala · ${VV.filter(x => SF.sblocco(cat, P, x.sf).ok).length} sbloccate su ${VV.length}</span></div><div class="grid cols-2" id="VV"></div>` : ''}
-      ${LL.length ? `<div class="sec-title" style="margin-top:26px"><h2>Sotto la lente</h2><span class="small muted" style="flex:1;margin-left:10px">prove brevi alla fine degli argomenti più importanti, sempre disponibili</span></div><div class="grid cols-2" id="LL"></div>` : ''}
+      ${tutteSf.some(x => x.sf.lente) ? `<p class="small muted" style="margin-top:22px">${CN.ico.lente} Le prove «Sotto la lente» le trovi in fondo agli esercizi dei singoli argomenti.</p>` : ''}
       <div class="sec-title" style="margin-top:26px"><h2>Le tue medaglie</h2><a class="small" href="#/traguardi">tutti i traguardi →</a></div>${CN.medaglieSfide(P)}`;
     const box = app.querySelector('#L');
     if(!L.length) box.innerHTML = '<p class="muted">Ancora nessuna sfida: arriveranno presto.</p>';
     L.forEach(x => box.appendChild(cartaSfida(s, x, P)));
     VV.forEach(x => app.querySelector('#VV').appendChild(cartaSfida(s, x, P)));
-    LL.forEach(x => app.querySelector('#LL').appendChild(cartaSfida(s, x, P)));
   }
   function viewSfida(s, P, id){
     const x = SF.elenco(cat).find(y => y.id === id);

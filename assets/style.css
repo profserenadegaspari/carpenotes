@@ -811,3 +811,24 @@ figure.carta{margin:12px 0}
 .bank.consuma .chip-v{font-size:.9rem}
 .linea .ld{min-width:78px}
 @media (max-width:560px){ .linea .lp{min-width:0} .linea li{flex-wrap:nowrap} }
+
+/* Macroargomenti: le parti di una materia, ognuna con la sua icona */
+.macro-ico{display:grid;place-items:center;width:58px;height:58px;flex:0 0 58px;border-radius:17px;background:color-mix(in srgb, var(--c,var(--brand)) 13%, var(--surface));color:var(--c,var(--brand));border:2px solid var(--edge);box-shadow:0 2px 0 var(--shadow-c);transform:rotate(-3deg)}
+.macro-ico svg{width:32px;height:32px}
+.macro-t{font-family:var(--display);font-weight:800;line-height:1.15;font-size:1.15rem}
+.macro-n{font-size:.8rem;font-weight:800;color:var(--muted);white-space:nowrap}
+.macro-bar{display:block;height:6px;border-radius:6px;background:var(--surface-2);overflow:hidden;width:100%}
+.macro-bar > i{display:block;height:100%;background:var(--green);border-radius:6px}
+.macro-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:16px}
+.macro-card{display:flex;gap:14px;align-items:flex-start;text-decoration:none;color:var(--ink);padding:16px;transition:transform .1s}
+.macro-card:hover{transform:translateY(-3px) rotate(-.3deg)}
+.mc-body{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;align-self:stretch}
+.mc-d{font-size:.86rem;color:var(--muted)}
+.mc-foot{display:flex;align-items:center;gap:10px;margin-top:auto;padding-top:8px}
+.macro-h1{display:flex;align-items:center;gap:14px}
+@media (max-width:560px){
+  .macro-cards{grid-template-columns:1fr;gap:10px} .macro-card{padding:13px;gap:12px;align-items:center}
+  .macro-card .macro-ico{width:50px;height:50px;flex-basis:50px} .macro-t{font-size:1.02rem}
+  .mc-d{font-size:.8rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden} .mc-foot{padding-top:4px}
+}
+@media (prefers-reduced-motion: reduce){ .macro-card:hover{transform:none} }

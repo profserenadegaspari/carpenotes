@@ -12,6 +12,7 @@
     coppa: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H4v1a3 3 0 0 0 4 3M16 6h4v1a3 3 0 0 1-4 3M12 13v4M8 20h8"/></svg>',
     spada: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4l-9.5 9.5M20 4h-4.5M20 4v4.5M6.5 13.5l4 4M5 17l2 2M3.5 20.5l2.5-2.5"/></svg>',
     grafico: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M11 20V5M17 20v-6M3 20h18"/></svg>',
+    orologio: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 2M10 3h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
     lente: '<svg viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-.15em"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>'
   };
   const stelleHtml = (n, big) => `<span class="stars ${big?'big':''}" role="img" aria-label="${n} stelle su 3">${[1,2,3].map(i => ico.stella(i <= n)).join('')}</span>`;
@@ -91,6 +92,15 @@
     return p >= Math.round((soglia + 100) / 2) ? 2 : 1;
   }
 
+  /* ---------- Verifica simulata: voto in decimi ----------
+     Voto = percentuale / 10, arrotondato al mezzo voto (74% -> 7½), mai sotto VOTO_MIN.
+     Con la soglia al 60% il 6 coincide con «argomento superato». */
+  const VOTO_MIN = 2;
+  const voto = perc => Math.max(VOTO_MIN, Math.min(10, Math.round(perc / 5) / 2));
+  const votoTxt = v => v == null ? '–' : Math.floor(v) + (v % 1 ? '½' : '');
+  const giudizio = v => v >= 10 ? 'Eccellente' : v >= 9 ? 'Ottimo' : v >= 8 ? 'Buono' : v >= 7 ? 'Discreto' : v >= 6 ? 'Sufficiente' : v >= 5 ? 'Insufficiente' : 'Gravemente insufficiente';
+  const minuti = s => s == null ? '' : s < 60 ? 'meno di 1 min' : `${Math.round(s / 60)} min`;
+
   /* ---------- Profilo: tutto ciò che si ricava dai risultati di uno studente ---------- */
   function profilo(rs, cat, sf){
     const idx = indice(cat), soglia = cat.impostazioni.soglia;
@@ -150,7 +160,8 @@
       const ok = x.args.filter(a => { const r = args.get(a.id); return r && r.best >= soglia; }).length;
       badge.push(B('sez-' + x.s.id, x.s.titolo, 'Supera tutti gli argomenti della sezione', '★', ok, x.args.length));
     });
-    return {rs, idx, soglia, xp, livello: livello(xp), streak, record, giorni, args, nEs, nRip, tempo,
+    const verifiche = rs.filter(r => r.modo === 'verifica');
+    return {rs, idx, soglia, xp, verifiche, mediaVoti: verifiche.length ? Math.round(verifiche.reduce((t, r) => t + (r.voto != null ? r.voto : voto(r.punteggio)), 0) / verifiche.length * 10) / 10 : null, livello: livello(xp), streak, record, giorni, args, nEs, nRip, tempo,
       sfide: S, precisione: nEs ? Math.round(pesata / nEs) : null, superati, perfetti, provati: validi.length, totArg: idx.arg.size, erroriAperti, tipi, badge};
   }
 
@@ -296,6 +307,9 @@
       </div>
       <div class="an-grid">
         <div class="panel" style="grid-column:1/-1"><h3>Andamento</h3><div class="sub">Punteggio degli ultimi ${Math.min(20, P.rs.length)} allenamenti, dal più vecchio al più recente</div>${graficoAndamento(P.rs, P.soglia)}</div>
+        ${P.verifiche.length ? `<div class="panel" style="grid-column:1/-1"><h3>Verifiche simulate</h3><div class="sub">${P.verifiche.length} ${P.verifiche.length === 1 ? 'verifica' : 'verifiche'} · media dei voti <b>${String(P.mediaVoti).replace('.', ',')}</b> · 10 domande miste, a tempo, con le correzioni solo alla fine</div>
+          <div class="tbl-wrap"><table class="tbl"><tr><th>Data</th><th>Argomento</th><th>Voto</th><th>Giuste</th><th>Tempo</th></tr>
+          ${P.verifiche.slice().reverse().map(r => { const v = r.voto != null ? r.voto : voto(r.punteggio); return `<tr><td>${new Date(r.data).toLocaleDateString('it-IT')}</td><td style="white-space:normal">${esc(r.argTitolo)}</td><td><span class="badge ${v >= 6 ? 'ok' : 'ko'}" title="${giudizio(v)} · ${r.punteggio}%">${votoTxt(v)}</span></td><td class="num">${r.corrette}/${r.totale}</td><td class="small">${r.tempoMax ? `${minuti(r.durata)} su ${minuti(r.tempoMax)}${r.fuoriTempo ? ' <span class="badge warn">oltre il tempo</span>' : ''}` : `${minuti(r.durata)} · senza tempo`}</td></tr>`; }).join('')}</table></div></div>` : ''}
         ${classe && classe.length > 1 ? `<div class="panel" style="grid-column:1/-1"><h3>Argomenti superati nel tempo</h3><div class="sub">Quanti argomenti ha superato alla fine di ogni settimana, confrontato con la mediana della classe ${esc(P.rs[0].classe||'')} (${classe.length} studenti). Una linea che sale vuol dire che sta andando avanti nel programma.</div>${graficoClasse(P, classe, CN.maiuscole(P.rs[0].nome||'').split(' ')[0])}</div>` : ''}
         <div class="panel"><h3>Giorni di attività</h3><div class="sub">Ultime cinque settimane</div>${calendario(P.giorni)}</div>
         <div class="panel"><h3>Padronanza per sezione</h3><div class="sub">Argomenti superati e da migliorare</div>
@@ -348,5 +362,5 @@
     return { go, get cur(){ return cur; }, refresh: () => cb(cur) };
   }
 
-  Object.assign(CN, {ico, stelleHtml, giorno, piu, lunedi, indice, LIVELLI, XP_REGOLE: REGOLE, daRipassare, xpDi, annotaXp, livello, stelle, profilo, adesivo, medaglia, medaglieSfide, renderAnalitiche, durata, router});
+  Object.assign(CN, {voto, votoTxt, giudizio, minuti, ico, stelleHtml, giorno, piu, lunedi, indice, LIVELLI, XP_REGOLE: REGOLE, daRipassare, xpDi, annotaXp, livello, stelle, profilo, adesivo, medaglia, medaglieSfide, renderAnalitiche, durata, router});
 })();

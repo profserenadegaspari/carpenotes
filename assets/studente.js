@@ -248,7 +248,8 @@
     if(!att.length && !quiz.length && !lente){ pane.innerHTML = '<p class="muted">Non ci sono ancora esercizi qui.</p>'; return; }
     const torna = () => viewArgomento(s, prof(s), m.id, sez.id, a.id, 'esercizi');
     const teoria = a.teoria ? () => viewArgomento(s, prof(s), m.id, sez.id, a.id, 'teoria') : null;
-    if(!att.length && !lente){ startQuiz(pane, s, {lista: quiz, m, sez, a, modo: 'argomento', esci: teoria || (() => R.go('/m/' + m.id)), teoria}); return; }
+    const ver = verificaPossibile(sez, a);
+    if(!att.length && !lente && !ver){ startQuiz(pane, s, {lista: quiz, m, sez, a, modo: 'argomento', esci: teoria || (() => R.go('/m/' + m.id)), teoria}); return; }
     pane.innerHTML = `<p class="muted" style="margin-top:0">Scegli da dove partire. Ogni attività è un esercizio completo: per superare l'argomento basta arrivare al ${P.soglia}% in una di queste.</p><div class="att-grid"></div>`;
     const grid = pane.querySelector('.att-grid');
     const carta = (id, tipo, titolo, info, livello, fn) => {
@@ -262,6 +263,15 @@
     att.forEach(x => carta(x.id, x.tipo, x.titolo || CN.TIPI[x.tipo], (x.tipo === 'versione' ? `${(x.frasi||[]).length} frasi guidate, passo per passo` : `${CN.attivita.conta(x)} ${CN.attivita.UNITA[x.tipo] || 'elementi'}`), x.livello,
       () => { startQuiz(pane, s, {lista: [x], att: x, m, sez, a, modo: 'argomento', esci: torna, teoria}); window.scrollTo(0, 0); }));
     if(quiz.length) carta('quiz', 'quiz-lampo', 'Quiz lampo', `${quiz.length} domande veloci, una alla volta`, '', () => { startQuiz(pane, s, {lista: quiz, m, sez, a, modo: 'argomento', esci: torna, teoria}); window.scrollTo(0, 0); });
+    if(ver){
+      const vv = rs.filter(r => r.modo === 'verifica'), ul = vv[vv.length - 1], D = domandeVerifica(sez, a);
+      const el = CN.h(`<div class="card att-card ver-card ${ul ? (ul.punteggio >= P.soglia ? 'done' : 'progress') : ''}">
+        <div class="att-top"><span class="att-tipo t-verifica">Verifica simulata</span><span class="att-liv">come in classe</span></div>
+        <h3>Mettiti alla prova</h3><div class="muted small">${D.lista.length} domande miste · circa ${D.minuti} minuti · voto in decimi e correzioni alla fine</div>
+        <div class="att-foot">${ul ? `<span class="badge ${ul.punteggio >= P.soglia ? 'ok' : 'ko'}">ultimo voto ${CN.votoTxt(ul.voto != null ? ul.voto : CN.voto(ul.punteggio))}</span>` : '<span class="muted small">Da fare</span>'}<button class="btn ${ul ? '' : 'primary'}">${ul ? 'Rifalla' : 'Inizia'} →</button></div></div>`);
+      el.querySelector('button').onclick = () => { startVerifica(pane, s, {m, sez, a, esci: torna}); window.scrollTo(0, 0); };
+      grid.appendChild(el);
+    }
     if(lente){
       // Sotto la lente: prova aperta in fondo all'argomento, corretta dalla prof (stesso percorso delle sfide)
       const st = CN.sfide.storia(s, lente.id), last = st[st.length - 1];
@@ -364,7 +374,156 @@
     step();
   }
 
-  function fuoriQuiz(){ CN.guardia = null; document.body.classList.remove('in-quiz'); document.querySelectorAll('#confetti').forEach(c => c.remove()); }
+  /* ---------- Verifica simulata ----------
+     10 domande miste dal quiz lampo dell'argomento (se non bastano, dagli argomenti precedenti della stessa sezione),
+     tempo indicativo, correzioni solo alla consegna, voto in decimi e riepilogo degli errori con il rimando alla teoria.
+     Il risultato si salva come attività «verifica» dell'argomento: vale per i punti, per superare l'argomento
+     e per «Ripassa i miei errori», come gli altri allenamenti. */
+  const VER = {n: 10, sec: {scelta: 45, vf: 30, completa: 60, individua: 60, etichetta: 90, abbina: 90}};
+  // pesca a turno un esercizio per tipo, così le domande sono di tipi diversi
+  function mixTipi(items){
+    const g = new Map(); CN.shuffle(items).forEach(x => { const t = x.e.tipo; if(!g.has(t)) g.set(t, []); g.get(t).push(x); });
+    const gruppi = CN.shuffle([...g.values()]), out = [];
+    while(gruppi.some(x => x.length)) gruppi.forEach(x => { if(x.length) out.push(x.shift()); });
+    return out;
+  }
+  function domandeVerifica(sez, a){
+    const vis = visibili(sez), i = vis.findIndex(x => x.id === a.id);
+    const propri = mixTipi((a.esercizi || []).map(e => ({e, a}))).slice(0, VER.n);
+    const altri = [];
+    if(propri.length < VER.n){ // dagli argomenti precedenti, il più vicino per primo, a turno
+      const fonti = []; for(let j = i - 1; j >= 0; j--) fonti.push(CN.shuffle(vis[j].esercizi || []).map(e => ({e, a: vis[j]})));
+      while(altri.length < VER.n - propri.length && fonti.some(f => f.length)) fonti.forEach(f => { if(f.length && altri.length < VER.n - propri.length) altri.push(f.shift()); });
+    }
+    const lista = mixTipi(propri.concat(altri));
+    const sec = lista.reduce((t, x) => t + (VER.sec[x.e.tipo] || 60), 0);
+    return {lista, nPropri: propri.length, nAltri: altri.length, minuti: Math.max(5, Math.ceil(sec / 60))};
+  }
+  const verificaPossibile = (sez, a) => (a.esercizi || []).length >= 5;
+
+  function startVerifica(pane, s, cfg){
+    const {m, sez, a} = cfg;
+    const D = domandeVerifica(sez, a);
+    fuoriQuiz();
+    pane.innerHTML = `<div class="card ver-intro">
+      <div class="att-top"><span class="att-tipo t-verifica">Verifica simulata</span></div>
+      <h2 style="margin:8px 0 4px">${esc(a.titolo)}</h2>
+      <ul class="ver-regole">
+        <li><b>${D.lista.length} domande</b> di tipi diversi${D.nAltri ? `: ${D.nPropri} su questo argomento e ${D.nAltri} di ripasso dagli argomenti precedenti` : ''}.</li>
+        <li><b>Come in classe:</b> le correzioni arrivano tutte alla consegna. Puoi tornare indietro e cambiare le risposte quando vuoi.</li>
+        <li><b>Tempo indicativo: ${D.minuti} minuti.</b> Il tempo resta in un angolo e si può nascondere; se finisce, scegli tu se consegnare o finire con calma.</li>
+        <li>Alla fine hai un <b>voto in decimi</b> e l'elenco degli errori, con il rimando alla teoria.</li>
+      </ul>
+      <label class="ver-check"><input type="checkbox" id="conTempo" checked> Con il tempo (come in classe)</label>
+      <div class="btn-row" style="margin-top:16px"><button class="btn ghost" id="no">Indietro</button><button class="btn primary lg" id="via">Inizia la verifica</button></div></div>`;
+    pane.querySelector('#no').onclick = cfg.esci;
+    pane.querySelector('#via').onclick = () => { esegui(pane, s, cfg, D, pane.querySelector('#conTempo').checked); window.scrollTo(0, 0); };
+  }
+
+  let verTimer = null;
+  function esegui(pane, s, cfg, D, conTempo){
+    const lista = D.lista, n = lista.length, t0 = Date.now(), tempoMax = conTempo ? D.minuti * 60 : null;
+    const risposto = new Array(n).fill(false);
+    let i = 0, fuoriTempo = false, scaduto = false, nascosto = false, finito = false;
+    const els = lista.map((x, k) => CN.renderEsercizio(x.e, {onChange: () => { risposto[k] = true; dots(); }}));
+    document.body.classList.add('in-quiz');
+    CN.guardia = () => finito ? null : 'Hai una verifica a metà: se esci, le risposte date finora non vengono salvate.';
+    pane.innerHTML = `<div class="quiz-head ver-head"><div class="ver-dots" id="dots"></div><button type="button" class="ver-timer" id="tm" ${tempoMax ? '' : 'hidden'}></button></div>
+      <div class="card" id="exbox"></div>
+      <div class="quiz-foot"><button class="btn ghost" id="esci">Esci</button><span style="flex:1"></span><button class="btn" id="ind">←</button><button class="btn primary lg" id="act">Avanti →</button></div>`;
+    const box = pane.querySelector('#exbox'), act = pane.querySelector('#act'), ind = pane.querySelector('#ind'), tm = pane.querySelector('#tm');
+    function dots(){
+      pane.querySelector('#dots').innerHTML = lista.map((x, k) => `<button type="button" class="vd ${risposto[k] ? 'on' : ''} ${k === i ? 'cur' : ''}" data-k="${k}" aria-label="Domanda ${k + 1}${risposto[k] ? ', risposta data' : ''}">${k + 1}</button>`).join('');
+      pane.querySelectorAll('#dots .vd').forEach(b => b.onclick = () => vai(+b.dataset.k));
+    }
+    function vai(k){
+      i = k; box.innerHTML = `<div class="small muted ver-num">Domanda ${i + 1} di ${n}</div>`; box.appendChild(els[i]);
+      ind.disabled = i === 0; act.textContent = i < n - 1 ? 'Avanti →' : 'Consegna';
+      act.classList.toggle('sun', i === n - 1); dots(); window.scrollTo(0, 0);
+    }
+    function orologio(){
+      if(!tempoMax || finito) return;
+      const resta = tempoMax - (Date.now() - t0) / 1000;
+      tm.classList.toggle('nascosto', nascosto); tm.classList.toggle('poco', resta > 0 && resta <= 120);
+      tm.innerHTML = `${CN.ico.orologio}<b class="tm-bar"><i style="width:${Math.max(0, Math.min(100, resta / tempoMax * 100)).toFixed(1)}%"></i></b><span>${nascosto ? '' : fuoriTempo ? 'tempo finito' : resta <= 60 ? 'meno di 1 min' : `${Math.ceil(resta / 60)} min`}</span>`;
+      tm.title = nascosto ? 'Mostra il tempo' : 'Nascondi il tempo';
+      if(resta <= 0 && !scaduto){ scaduto = true; tempoFinito(); }
+    }
+    async function tempoFinito(){
+      const bg = CN.modale(`<h3>Il tempo è finito</h3><p class="muted">In una verifica vera ora si consegna. Qui puoi scegliere: consegna adesso, oppure finisci con calma (nel riepilogo resterà scritto che hai superato il tempo).</p>
+        <div class="btn-row" style="justify-content:flex-end;margin-top:14px"><button class="btn" data-calma>Finisco con calma</button><button class="btn primary" data-ora>Consegna adesso</button></div>`);
+      bg.querySelector('[data-calma]').onclick = () => { bg.remove(); fuoriTempo = true; orologio(); };
+      bg.querySelector('[data-ora]').onclick = () => { bg.remove(); consegna(); };
+    }
+    tm.onclick = () => { nascosto = !nascosto; orologio(); };
+    clearInterval(verTimer); if(tempoMax){ verTimer = setInterval(orologio, 1000); orologio(); }
+    ind.onclick = () => { if(i > 0) vai(i - 1); };
+    pane.querySelector('#esci').onclick = async () => { if(await CN.conferma('Vuoi uscire? Questa verifica non verrà salvata.', 'Esci')){ fuoriQuiz(); cfg.esci(); } };
+    act.onclick = async () => {
+      if(i < n - 1) return vai(i + 1);
+      const vuote = risposto.filter(x => !x).length;
+      if(!await CN.conferma(vuote ? `${vuote === 1 ? 'Una domanda è' : vuote + ' domande sono'} senza risposta e ${vuote === 1 ? 'vale' : 'valgono'} zero. Consegni lo stesso?` : 'Consegni la verifica? Dopo vedrai il voto e le correzioni.', 'Consegna')) return;
+      consegna();
+    };
+    function consegna(){
+      if(finito) return; finito = true; clearInterval(verTimer);
+      const esiti = [], righe = [];
+      let punti = 0, nOk = 0;
+      els.forEach((el, k) => {
+        const r = el.verifica(), p = r ? Math.round(r.punti * 100) / 100 : 0;
+        if(!r){ el.dataset.done = '1'; el.insertAdjacentHTML('beforeend', `<div class="feedback ko"><b>Senza risposta.</b>${lista[k].e.spiegazione ? `<div class="exp">${lista[k].e.spiegazione}</div>` : ''}</div>`); }
+        punti += p; if(p >= .999) nOk++;
+        esiti.push({id: lista[k].e.id, p}); righe.push({k, p, vuota: !r, x: lista[k], el});
+      });
+      const perc = Math.round(punti / n * 100), v = CN.voto(perc), durata = Math.round((Date.now() - t0) / 1000);
+      const prima = prof(s);
+      const rec = {id: CN.uid('r'), nome: s.nome, classe: s.classe, materia: cfg.m.id, sezione: cfg.sez.id, argomento: cfg.a.id, argTitolo: cfg.a.titolo,
+        punteggio: perc, corrette: nOk, totale: n, errori: esiti.filter(e => e.p < .999).map(e => e.id), esiti, ripasso: false, modo: 'verifica',
+        attivita: 'verifica', attTitolo: 'Verifica simulata', voto: v, tempoMax, fuoriTempo, data: new Date().toISOString(), durata};
+      CN.addRisultato(rec);
+      fuoriQuiz();
+      pagella(pane, s, cfg, rec, prima, righe);
+    }
+    vai(0);
+  }
+
+  function pagella(pane, s, cfg, rec, prima, righe){
+    const P = prof(s); header(s, P, R.cur);
+    const v = rec.voto, guadagno = Math.max(0, P.xp - prima.xp);
+    const prec = prima.verifiche.filter(r => r.argomento === rec.argomento).map(r => r.voto != null ? r.voto : CN.voto(r.punteggio));
+    const msg = v >= 9 ? 'Sei pronto per la verifica vera.' : v >= 7 ? 'Bene: ripassa gli errori e sei a posto.' : v >= 6 ? 'Sufficiente: con un ripasso degli errori puoi salire.' : v >= 5 ? 'Ci sei quasi: rivedi la teoria degli errori e riprova.' : 'Meglio ripartire dalla teoria, poi rifai la verifica.';
+    const sbagliate = righe.filter(r => r.p < .999), giuste = righe.filter(r => r.p >= .999);
+    const ok = rec.punteggio >= P.soglia;
+    const tempo = rec.tempoMax ? `${CN.minuti(rec.durata)} su ${CN.minuti(rec.tempoMax)}${rec.fuoriTempo ? ' (oltre il tempo)' : ''}` : `${CN.minuti(rec.durata)}, senza tempo`;
+    pane.innerHTML = `<div class="card ver-pagella">
+        <div class="voto-box ${v >= 6 ? 'suff' : 'insuff'}"><span class="voto-l">voto</span><span class="voto-n">${CN.votoTxt(v)}</span></div>
+        <div class="ver-info">
+          <h2 style="margin:0">${CN.giudizio(v)}</h2>
+          <p class="muted" style="margin:4px 0 0">${rec.corrette} risposte giuste su ${rec.totale} · ${rec.punteggio}% · tempo: ${tempo}</p>
+          <p style="margin:8px 0 0;font-weight:700">${msg}</p>
+          ${prec.length ? `<p class="small muted" style="margin:4px 0 0">Le volte prima su questo argomento: ${prec.map(CN.votoTxt).join(', ')}.</p>` : ''}
+          ${guadagno ? `<div class="xp-gain pop">+${guadagno} XP</div>` : ''}
+        </div></div>
+      ${sbagliate.length ? `<div class="sec-title"><h2>Da rivedere</h2><span class="badge ko">${sbagliate.length}</span></div><div id="sb"></div>` : `<div class="notice" style="margin-top:16px"><b>Nessun errore!</b> Hai risposto bene a tutte le domande.</div>`}
+      ${giuste.length && sbagliate.length ? `<details class="card flat ver-giuste"><summary><b>Risposte giuste</b> (${giuste.length})</summary><div id="gs"></div></details>` : ''}
+      <div class="btn-row" style="justify-content:center;margin-top:20px" id="b"></div>`;
+    const teoriaDi = x => { const y = CN.findArg(cat, cfg.m.id, cfg.sez.id, x.a.id); return y.a && y.a.teoria ? `#/a/${cfg.m.id}/${cfg.sez.id}/${x.a.id}` : null; };
+    const blocco = r => { const w = CN.h(`<section class="card ver-err"><div class="ver-err-h"><span class="pn">Domanda ${r.k + 1}</span>${r.vuota ? '<span class="badge">senza risposta</span>' : r.p > 0 ? `<span class="badge warn">${Math.round(r.p * 100)}% giusta</span>` : ''}<span class="small muted" style="margin-left:auto">${esc(r.x.a.titolo)}</span></div></section>`);
+      w.appendChild(r.el); const t = teoriaDi(r.x);
+      if(t && r.p < .999) w.insertAdjacentHTML('beforeend', `<a class="ver-teoria" href="${t}">${CN.ico.libro}<span>Rivedi la teoria: <b>${esc(r.x.a.titolo)}</b></span></a>`);
+      return w; };
+    const sb = pane.querySelector('#sb'); if(sb) sbagliate.forEach(r => sb.appendChild(blocco(r)));
+    const gs = pane.querySelector('#gs'); if(gs) giuste.forEach(r => gs.appendChild(blocco(r)));
+    const b = pane.querySelector('#b');
+    const add = (html, fn) => { const x = CN.h(html); if(fn) x.onclick = fn; b.appendChild(x); return x; };
+    if(sbagliate.length) add(`<button class="btn accent">Ripassa gli errori (${sbagliate.length})</button>`, () => { startQuiz(pane, s, Object.assign({}, cfg, {lista: sbagliate.map(r => r.x.e), modo: 'errori', teoria: null})); window.scrollTo(0, 0); });
+    add(`<button class="btn primary">Nuova verifica</button>`, () => { startVerifica(pane, s, cfg); window.scrollTo(0, 0); });
+    add(`<button class="btn ghost">${cfg.daRipasso ? 'Torna al ripasso' : 'Torna all\'argomento'}</button>`, cfg.esci);
+    window.scrollTo(0, 0);
+    if(ok && v >= 8) coriandoli();
+  }
+
+  function fuoriQuiz(){ clearInterval(verTimer); CN.guardia = null; document.body.classList.remove('in-quiz'); document.querySelectorAll('#confetti').forEach(c => c.remove()); }
   function coriandoli(){
     if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const c = document.createElement('canvas'); c.id = 'confetti'; document.body.appendChild(c);
@@ -403,6 +562,7 @@
           <p class="muted small">${debole ? `Il tuo punteggio più basso è in «${esc(debole.x.a.titolo)}»: ${debole.best}%.` : 'Qui comparirà l\'argomento su cui hai il punteggio più basso.'}</p>
           ${debole ? `<a class="btn" href="${link(debole)}">Allenati su questo</a>` : '<button class="btn" disabled>Ancora nessun dato</button>'}</div>
       </div>
+      <div class="card ver-rip" id="verR"></div>
       <div class="sec-title"><h2>Da rinfrescare</h2><span class="small muted">fatti bene, ma più di una settimana fa</span></div>
       ${rinfresca.map(r => riga(r, `${giorniFa(r.data)} giorni fa`)).join('') || '<p class="muted">Niente da rinfrescare per ora: gli argomenti fatti bene tornano qui dopo una settimana.</p>'}
       <div class="sec-title"><h2>Da rinforzare</h2><span class="small muted">meno di due stelle</span></div>
@@ -411,6 +571,21 @@
     const pane = app.querySelector('#pane');
     const via = (lista, modo) => { pane.innerHTML = ''; startQuiz(pane, s, {lista, modo, esci: () => R.refresh()}); window.scrollTo(0, 0); };
     app.querySelector('#err').onclick = () => via(D.lista, 'ripasso-errori');
+    // Verifica simulata su un argomento a scelta (tra quelli sbloccati)
+    const scelte = [];
+    cat.materie.forEach(m => (m.sezioni||[]).forEach(sez => visibili(sez).forEach((a, i) => { if(!bloccato(P, sez, i) && verificaPossibile(sez, a)) scelte.push({m, sez, a, b: best(P, a.id)}); })));
+    const fatti = scelte.filter(x => x.b !== null);
+    const opt = x => `<option value="${x.m.id}|${x.sez.id}|${x.a.id}">${esc(x.a.titolo)}${x.b !== null ? ` · migliore ${x.b}%` : ''}</option>`;
+    const gruppi = []; scelte.forEach(x => { const k = x.m.nome + ' › ' + x.sez.titolo; let g = gruppi.find(y => y.k === k); if(!g) gruppi.push(g = {k, v: []}); g.v.push(x); });
+    const vr = app.querySelector('#verR');
+    vr.innerHTML = `<div class="ver-rip-in"><div class="tagc" style="background:var(--green)">10</div><div style="flex:1;min-width:220px"><h3 style="margin:0">Verifica simulata</h3>
+      <p class="muted small" style="margin:4px 0 0">Mettiti alla prova come in classe: dieci domande miste, un tempo indicativo, il voto in decimi e gli errori da rivedere.</p></div></div>
+      <div class="btn-row" style="margin-top:12px"><select class="in" id="verArg" aria-label="Argomento della verifica" style="flex:1;min-width:200px;width:auto">
+      ${fatti.length ? `<optgroup label="Già allenati">${fatti.map(opt).join('')}</optgroup>` : ''}${gruppi.map(g => `<optgroup label="${esc(g.k)}">${g.v.map(opt).join('')}</optgroup>`).join('')}</select>
+      <button class="btn primary" id="verVia" ${scelte.length ? '' : 'disabled'}>Prepara la verifica →</button></div>`;
+    if(fatti.length) vr.querySelector('#verArg').value = vr.querySelector('#verArg option').value;
+    vr.querySelector('#verVia').onclick = () => { const [mi, si, ai] = vr.querySelector('#verArg').value.split('|'); const y = CN.findArg(cat, mi, si, ai);
+      pane.innerHTML = ''; startVerifica(pane, s, {m: y.m, sez: y.s, a: y.a, daRipasso: true, esci: () => R.refresh()}); window.scrollTo(0, 0); };
     app.querySelector('#mix').onclick = () => via(CN.shuffle(pool).slice(0, 10), 'ripasso-misto');
   }
 

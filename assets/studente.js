@@ -13,6 +13,42 @@
     return !superato(P, visibili(sez)[idx-1].id);
   }
 
+  /* ---------- Macroargomenti: le sezioni di una materia raggruppate, ognuna con la sua icona ----------
+     Il gruppo nasce dal titolo: «Scrittura: il riassunto» e «Scrittura: i tipi di testo» finiscono in «Scrittura».
+     Le icone sono disegni originali (SVG semplici), scelti in base al nome della sezione. */
+  const _p = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const ICO_MACRO = [
+    [/ortograf|suoni|punteggiat/, _p('<path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/><path d="M4 4.5l3 2"/>'), 'Ortografia'],
+    [/grammatical/, _p('<path d="M3 11.5V4h7.5L21 14.5 13.5 22z"/><circle cx="7.3" cy="8.3" r="1.6"/>'), 'Grammatica'],
+    [/nome e agg/, _p('<path d="M3 11.5V4h7.5L21 14.5 13.5 22z"/><circle cx="7.3" cy="8.3" r="1.6"/>')],
+    [/logica|casi/, _p('<circle cx="12" cy="4.8" r="2.3"/><circle cx="4.8" cy="19" r="2.3"/><circle cx="19.2" cy="19" r="2.3"/><circle cx="12" cy="19" r="2.3"/><path d="M12 7.1V16.7M10.4 6.6 6 16.9M13.6 6.6 18 16.9"/>')],
+    [/periodo/, _p('<path d="M10 14.5a4 4 0 0 1 0-5.7l3-3a4 4 0 0 1 5.7 5.7l-1.4 1.4"/><path d="M14 9.5a4 4 0 0 1 0 5.7l-3 3a4 4 0 0 1-5.7-5.7l1.4-1.4"/>')],
+    [/lessico/, _p('<path d="M3 5.5c3-1.3 6-1.3 9 .8 3-2.1 6-2.1 9-.8v13.5c-3-1.3-6-1.3-9 .8-3-2.1-6-2.1-9-.8z"/><path d="M12 6.3V20"/>'), 'Lessico'],
+    [/scrittura/, _p('<path d="M12 2.5 18 10l-6 11.5L6 10z"/><path d="M12 13v8.5"/><circle cx="12" cy="11" r="1.6"/>'), 'Scrittura'],
+    [/epica/, _p('<path d="M6 21v-8.5a6 6 0 0 1 12 0V21"/><path d="M18 21h-4v-6.5H6"/><path d="M8.5 7.4C9 4.5 11 3 14.5 3c2.7 0 4.8 1.2 6 3"/>'), 'Epica'],
+    [/primi passi/, _p('<path d="M12 21v-9"/><path d="M12 12C12 8 9.5 5.5 4.5 5.5c0 4 2.5 6.5 7.5 6.5z"/><path d="M12 10c0-3.4 2.2-5.5 6.5-5.5 0 3.4-2.2 5.5-6.5 5.5z"/>'), 'Primi passi'],
+    [/verbo/, _p('<path d="M13.5 2 4.5 13.5h7L10.5 22l9-11.5h-7z"/>'), 'Il verbo'],
+    [/pronom/, _p('<circle cx="12" cy="8" r="4"/><path d="M4 21c.6-4 3.8-6.5 8-6.5s7.4 2.5 8 6.5"/>'), 'I pronomi'],
+    [/egitt/, _p('<path d="M2.5 20.5 11 6l8.5 14.5z"/><path d="M11 6l3.5 14.5"/><circle cx="19" cy="5" r="2"/><path d="M1.5 20.5h21"/>'), 'Egitto'],
+    [/egeo|minoic|micene/, _p('<path d="M2 19c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0"/><path d="M4.5 14.5h15L17 17H7z"/><path d="M12 14.5V3l6 8.5h-6"/>'), 'Egeo'],
+    [/greci|grecia|polis/, _p('<path d="M3 8.5 12 4l9 4.5z"/><path d="M5.5 11v7M10 11v7M14 11v7M18.5 11v7"/><path d="M3 21h18M4 11h16"/>'), 'I Greci'],
+    [/romani|roma/, _p('<path d="M4 21V11a8 8 0 0 1 16 0v10"/><path d="M8.5 21v-8a3.5 3.5 0 0 1 7 0v8"/><path d="M2.5 21h19"/>'), 'Roma']
+  ];
+  const ICO_LIBRO = _p('<path d="M5 3.5h11.5a2 2 0 0 1 2 2V20.5H7a2 2 0 0 1-2-2z"/><path d="M5 18.5a2 2 0 0 1 2-2h11.5"/>');
+  const icoMacro = t => { t = t.toLowerCase(); return ICO_MACRO.find(([re]) => re.test(t)) || [null, ICO_LIBRO, null]; };
+  function macroDi(m){
+    const out = [];
+    (m.sezioni||[]).forEach(sez => {
+      if(!visibili(sez).length) return;
+      const tit = sez.gruppo || (sez.titolo.includes(':') ? sez.titolo.split(':')[0].trim() : sez.titolo);
+      let g = out.find(x => x.titolo === tit);
+      if(!g){ const [, ico, breve] = icoMacro(tit + ' ' + sez.titolo); g = {id: sez.id, titolo: tit, breve: breve || tit, sezioni: [], ico}; out.push(g); }
+      g.sezioni.push(sez);
+    });
+    return out;
+  }
+  const contaMacro = (P, g) => { const v = g.sezioni.flatMap(visibili); return {ok: v.filter(a => superato(P, a.id)).length, tot: v.length}; };
+
   const TABS = [['/', 'Materie', 'libro'], ['/ripasso', 'Ripasso', 'giro'], ['/sfide', 'Sfide', 'spada'], ['/traguardi', 'Traguardi', 'coppa'], ['/progressi', 'Progressi', 'grafico']];
   function header(s, P, path){
     document.body.classList.toggle('has-tabs', !!s);
@@ -176,29 +212,44 @@
   }
 
   /* ---------- Sezioni e argomenti di una materia ---------- */
-  function viewMateria(s, P, mId){
-    const m = cat.materie.find(x => x.id === mId); if(!m) return R.go('/');
-    app.innerHTML = `<div class="crumbs"><a href="#/">Materie</a> › <span>${esc(m.nome)}</span></div>
-      <h1><span class="hl">${esc(m.nome)}</span></h1><div id="sez"></div>`;
-    const box = app.querySelector('#sez');
-    (m.sezioni||[]).forEach(sez => {
-      const vis = visibili(sez); if(!vis.length) return;
-      const ok = vis.filter(a => superato(P, a.id)).length;
-      const wrap = CN.h(`<section><div class="sec-title"><h2>${esc(sez.titolo)}</h2><span class="badge ${ok === vis.length ? 'ok' : ''}">${ok} / ${vis.length}</span></div><p class="muted">${esc(sez.descrizione||'')}</p><div class="list"></div></section>`);
-      const list = wrap.querySelector('.list');
-      vis.forEach((a, i) => {
-        const b = best(P, a.id), lock = bloccato(P, sez, i);
-        const cls = b === null ? '' : b >= P.soglia ? 'done' : 'progress';
-        const el = CN.h(`<div class="arg ${cls} ${lock ? 'locked' : ''}" tabindex="0">
-          <div class="n">${lock ? CN.ico.lucchetto : i+1}</div>
-          <div class="body"><div class="title">${esc(a.titolo)}</div><div class="meta">${esc(a.descrizione||'')} · ${nAtt(a)}${b !== null ? ` · migliore ${b}%` : ''}</div></div>
-          ${CN.stelleHtml(CN.stelle(b, P.soglia))}</div>`);
-        el.onclick = () => { if(lock){ CN.toast(`Supera prima l'argomento precedente (almeno ${P.soglia}%).`); return; } R.go(`/a/${m.id}/${sez.id}/${a.id}`); };
-        el.onkeydown = e => { if(e.key === 'Enter') el.click(); };
-        list.appendChild(el);
-      });
-      box.appendChild(wrap);
+  function sezioneEl(P, m, sez){
+    const vis = visibili(sez);
+    const ok = vis.filter(a => superato(P, a.id)).length;
+    const wrap = CN.h(`<section id="sez-${sez.id}" style="--c:var(--${m.colore||'brand'})"><div class="sec-title"><h2>${esc(sez.titolo)}</h2><span class="badge ${ok === vis.length ? 'ok' : ''}">${ok} / ${vis.length}</span></div><p class="muted">${esc(sez.descrizione||'')}</p><div class="list"></div></section>`);
+    const list = wrap.querySelector('.list');
+    vis.forEach((a, i) => {
+      const b = best(P, a.id), lock = bloccato(P, sez, i);
+      const cls = b === null ? '' : b >= P.soglia ? 'done' : 'progress';
+      const el = CN.h(`<div class="arg ${cls} ${lock ? 'locked' : ''}" tabindex="0">
+        <div class="n">${lock ? CN.ico.lucchetto : i+1}</div>
+        <div class="body"><div class="title">${esc(a.titolo)}</div><div class="meta">${esc(a.descrizione||'')} · ${nAtt(a)}${b !== null ? ` · migliore ${b}%` : ''}</div></div>
+        ${CN.stelleHtml(CN.stelle(b, P.soglia))}</div>`);
+      el.onclick = () => { if(lock){ CN.toast(`Supera prima l'argomento precedente (almeno ${P.soglia}%).`); return; } R.go(`/a/${m.id}/${sez.id}/${a.id}`); };
+      el.onkeydown = e => { if(e.key === 'Enter') el.click(); };
+      list.appendChild(el);
     });
+    return wrap;
+  }
+  function viewMateria(s, P, mId, gId){
+    const m = cat.materie.find(x => x.id === mId); if(!m) return R.go('/');
+    const G = macroDi(m), g = gId ? G.find(x => x.id === gId) : null, col = `--c:var(--${m.colore||'brand'})`;
+    if(gId && !g) return R.go('/m/' + m.id);
+    if(!g){
+      // Prima le icone: una scheda per ogni macroargomento della materia
+      app.innerHTML = `<div class="crumbs"><a href="#/">Materie</a> › <span>${esc(m.nome)}</span></div>
+        <h1><span class="hl">${esc(m.nome)}</span></h1><p class="muted" style="margin-top:-6px">Scegli da quale parte del programma vuoi partire.</p>
+        <nav class="macro-cards" aria-label="Parti del programma">${G.map(x => { const c = contaMacro(P, x), pc = c.tot ? Math.round(c.ok / c.tot * 100) : 0;
+          const desc = x.sezioni.length > 1 ? x.sezioni.map(z => z.titolo.split(':').slice(1).join(':').trim() || z.titolo).join(' · ').replace(/^./, c => c.toUpperCase()) : (x.sezioni[0].descrizione || '');
+          return `<a class="card macro-card" href="#/m/${m.id}/${x.id}" style="${col}">
+            <span class="macro-ico">${x.ico}</span><span class="mc-body"><span class="macro-t">${esc(x.titolo)}</span><span class="mc-d">${esc(desc)}</span>
+            <span class="mc-foot"><span class="macro-bar"><i style="width:${pc}%"></i></span><span class="macro-n">${c.ok} di ${c.tot}</span></span></span></a>`; }).join('')}</nav>`;
+      return;
+    }
+    // Poi gli argomenti del macroargomento scelto
+    app.innerHTML = `<div class="crumbs"><a href="#/">Materie</a> › <a href="#/m/${m.id}">${esc(m.nome)}</a> › <span>${esc(g.titolo)}</span></div>
+      <h1 class="macro-h1" style="${col}"><span class="macro-ico">${g.ico}</span><span class="hl">${esc(g.titolo)}</span></h1><div id="sez"></div>`;
+    const box = app.querySelector('#sez');
+    g.sezioni.forEach(sez => box.appendChild(sezioneEl(P, m, sez)));
   }
 
   const nAtt = a => { const n = (a.attivita||[]).length, q = (a.esercizi||[]).length; return n ? `${n} attività${q ? ' + quiz lampo' : ''}` : `${q} esercizi`; };
@@ -210,7 +261,8 @@
     const vis = visibili(sez), idx = vis.findIndex(x => x.id === aId);
     if(bloccato(P, sez, idx)){ CN.toast('Argomento non ancora sbloccato.'); return R.go('/m/' + mId); }
     fuoriQuiz();
-    app.innerHTML = `<div class="crumbs"><a href="#/">Materie</a> › <a href="#/m/${m.id}">${esc(m.nome)}</a> › <span>${esc(sez.titolo)}</span></div>
+    const gr = macroDi(m).find(x => x.sezioni.includes(sez));
+    app.innerHTML = `<div class="crumbs"><a href="#/">Materie</a> › <a href="#/m/${m.id}">${esc(m.nome)}</a> › <a href="#/m/${m.id}/${gr ? gr.id : ''}">${esc(gr ? gr.titolo : sez.titolo)}</a>${gr && gr.sezioni.length > 1 ? ` › <span>${esc(sez.titolo.split(':').slice(1).join(':').trim() || sez.titolo)}</span>` : ''}</div>
       <div class="btn-row arg-head" style="justify-content:space-between;margin-bottom:12px"><h1 style="margin:0">${esc(a.titolo)}</h1>${CN.stelleHtml(CN.stelle(best(P, a.id), P.soglia))}</div>
       <div class="tabs">${a.teoria ? '<button data-t="teoria">Teoria</button>' : ''}<button data-t="esercizi">Esercizi (${(a.attivita||[]).length + ((a.esercizi||[]).length ? 1 : 0)})</button><button data-t="storico">I miei tentativi</button></div>
       <div id="pane"></div>`;
@@ -441,7 +493,8 @@
     return el;
   }
   function viewSfide(s, P){
-    const tutteSf = SF.elenco(cat), L = tutteSf.filter(x => !x.sf.lente && !x.sf.versione), LL = tutteSf.filter(x => x.sf.lente), VV = tutteSf.filter(x => x.sf.versione);
+    // Le prove «Sotto la lente» non sono più elencate qui: si aprono in fondo agli esercizi del loro argomento
+    const tutteSf = SF.elenco(cat), L = tutteSf.filter(x => !x.sf.lente && !x.sf.versione), VV = tutteSf.filter(x => x.sf.versione);
     const R1 = SF.riepilogo(SF.diStudente(s));
     app.innerHTML = `<section class="hero"><h1>Le sfide del <span class="hl">prof</span></h1>
       <p class="muted">Esercizi tosti, senza soluzione automatica: li corregge la tua insegnante e ti manda la correzione per email. Ogni sfida consegnata ti avvicina a una nuova medaglia.</p></section>
@@ -453,13 +506,12 @@
       <div class="sec-title"><h2>Le sfide</h2><span class="small muted" style="flex:1;margin-left:10px">${L.filter(x => SF.sblocco(cat, P, x.sf).ok).length} sbloccate su ${L.length}</span>${R1.consegnate ? `<span class="badge ok">${R1.consegnate} ${R1.consegnate === 1 ? 'consegnata' : 'consegnate'}</span>` : ''}</div>
       <div class="grid cols-2" id="L"></div>
       ${VV.length ? `<div class="sec-title" style="margin-top:26px"><h2>Versioni</h2><span class="small muted" style="flex:1;margin-left:10px">si traduce una frase alla volta, con l'aiuto che cala · ${VV.filter(x => SF.sblocco(cat, P, x.sf).ok).length} sbloccate su ${VV.length}</span></div><div class="grid cols-2" id="VV"></div>` : ''}
-      ${LL.length ? `<div class="sec-title" style="margin-top:26px"><h2>Sotto la lente</h2><span class="small muted" style="flex:1;margin-left:10px">prove brevi alla fine degli argomenti più importanti, sempre disponibili</span></div><div class="grid cols-2" id="LL"></div>` : ''}
+      ${tutteSf.some(x => x.sf.lente) ? `<p class="small muted" style="margin-top:22px">${CN.ico.lente} Le prove «Sotto la lente» le trovi in fondo agli esercizi dei singoli argomenti.</p>` : ''}
       <div class="sec-title" style="margin-top:26px"><h2>Le tue medaglie</h2><a class="small" href="#/traguardi">tutti i traguardi →</a></div>${CN.medaglieSfide(P)}`;
     const box = app.querySelector('#L');
     if(!L.length) box.innerHTML = '<p class="muted">Ancora nessuna sfida: arriveranno presto.</p>';
     L.forEach(x => box.appendChild(cartaSfida(s, x, P)));
     VV.forEach(x => app.querySelector('#VV').appendChild(cartaSfida(s, x, P)));
-    LL.forEach(x => app.querySelector('#LL').appendChild(cartaSfida(s, x, P)));
   }
   function viewSfida(s, P, id){
     const x = SF.elenco(cat).find(y => y.id === id);
@@ -605,7 +657,7 @@
     const P = prof(s);
     header(s, P, path);
     const p = path.replace(/^\//, '').split('/');
-    if(p[0] === 'm') return viewMateria(s, P, p[1]);
+    if(p[0] === 'm') return viewMateria(s, P, p[1], p[2]);
     if(p[0] === 'a') return viewArgomento(s, P, p[1], p[2], p[3]);
     if(p[0] === 'ripasso') return viewRipasso(s, P);
     if(p[0] === 'sfide') return viewSfide(s, P);
